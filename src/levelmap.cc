@@ -32,15 +32,23 @@ int LevelMap::chunk_at(int px_x, int px_y) const {
   return (px_x / chunk_size) + (px_y / chunk_size) * chunk_pitch;
 }
 
+uint32_t LevelMap::clr_at(int layer, int tx, int ty) const {
+  int offs = ty * tilemaps.at(layer)->pitch + 4 * tx;
+  uint32_t res = 0;
+  for (int i = 0; i < 4; i++)
+    res = (res << 8) | ((uint8_t *)(tilemaps.at(layer)->pixels))[offs + i];
+  return res;
+}
+
 Tile LevelMap::tile_at(int layer, int px_x, int px_y) const {
   assert(tilemaps.count(layer) > 0);
-  int offs =
-      (px_y / tile_size) * tilemaps.at(layer)->pitch + 4 * (px_x / tile_size);
-  uint32_t id = 0;
-  for (int i = 0; i < 4; i++)
-    id = (id << 8) | ((uint8_t *)(tilemaps.at(layer)->pixels))[offs + i];
-  assert(tiles.count(id) > 0);
-  return tiles.at(id);
+  int tx = px_x / tile_size, ty = px_y / tile_size;
+  uint32_t clr = clr_at(layer, tx, ty);
+
+  // inherited classes do some recoding here
+
+  assert(tiles.count(clr) > 0);
+  return tiles.at(clr);
 }
 
 void LevelMap::addTiles(const std::vector<Tile> &t) {

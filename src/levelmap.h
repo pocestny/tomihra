@@ -10,7 +10,7 @@
 #include <vector>
 
 struct Tile {
-  uint32_t id;
+  uint32_t id;  // global id
   std::string tilesheet;
   int x, y;  // absolute position in tilesheet
   bool passable;
@@ -31,18 +31,24 @@ class LevelMap {
 
   SDL_Renderer *renderer;  // not owned
 
-  int tile_size, width, height;  // dimensions in tiles
+  int tile_size, width, height;  // dimensions in number of tiles
   std::unordered_map<int, SDL_Surface *>
-      tilemaps;  // render layer -> map of tiles
+      tilemaps;  // render layer -> rgba8 surface of tiles (coded as colors)
+
   std::unordered_map<std::string, SDL_Surface *> tilesheets;
-  std::unordered_map<uint32_t, Tile> tiles;
-  std::vector<uint32_t> _layers;
+  std::unordered_map<uint32_t, Tile> tiles;  // id->tile
+  std::vector<uint32_t> _layers;             // list of render layers
 
   int chunk_size, chunk_pitch;
   std::vector<Chunk *> chunks;
 
-  inline int chunk_at(int px_x, int px_y) const;
-  inline Tile tile_at(int layer, int px_x, int px_y) const;
+  int chunk_at(int px_x, int px_y) const;  // chunk index at pixel coordinates
+
+  // color at given position in tilemap
+  uint32_t clr_at(int layer, int tx, int ty) const;
+  
+  // tile at given pixel coordinates
+  Tile virtual tile_at(int layer, int px_x, int px_y) const;
 
   void makeChunk(int x, int y);  // in chunk coordinates
 
@@ -50,7 +56,7 @@ class LevelMap {
 
  public:
   LevelMap(SDL_Renderer *_renderer, int _tile_size, int _width, int _height,
-           int _chunk_size = 4096);
+           int _chunk_size = 2048);
   ~LevelMap();
 
   const SDL_Rect *screen() const { return &_screen; }

@@ -5,6 +5,9 @@
  * hash functions for vectors, keys, etc
  */
 
+#include <functional>
+#include <cstddef>
+
 namespace std{
 // https://www.variadic.xyz/2018/01/15/hashing-stdpair-and-stdtuple/
 
