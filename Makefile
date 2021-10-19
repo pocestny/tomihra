@@ -5,8 +5,8 @@ OUT     ?= build
 
 srcdir    ?= src
 resdir    ?= resources
-sources   := $(srcdir)/$(SOURCES)
-outdir    := $(OUT)
+sources   := $(addprefix $(srcdir)/,$(SOURCES))
+outdir    := $(OUT)/linux
 outbin    := $(outdir)/$(BINARY)
 objects   := $(addprefix $(outdir)/,$(SOURCES:.cc=.o))
 
@@ -18,7 +18,13 @@ resconf   := $(resdir)/resources.conf
 rcomp     := $(outdir)/resource_compiler
 rcompdir  := resource_compiler
 
+webdir    := $(OUT)/web
+EMCC      := emcc
+EMCCFLAGS :=  -O3 -s ALLOW_MEMORY_GROWTH=1 -s USE_SDL=2 -s USE_SDL_IMAGE=2 -s SDL2_IMAGE_FORMATS='["png"]' -I $(outdir) -I $(srcdir) -g -std=c++20
+
 all: $(rcomp) $(outbin)
+
+#  resources
 
 $(rcomp): 
 	mkdir -p $(outdir)
@@ -27,6 +33,9 @@ $(rcomp):
 $(resources): $(resconf)
 	$(rcomp) -d $(resdir) -f $(resconf) -o $@
 
+
+#  linux binary
+
 $(outbin): $(resources) $(objects) 
 	mkdir -p $(outdir)
 	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS)
@@ -34,6 +43,16 @@ $(outbin): $(resources) $(objects)
 
 $(outdir)/%.o: $(srcdir)/%.cc 
 	$(CXX) $(CXXFLAGS) -o $@ -c $<
+
+
+#  web
+
+web: $(rcomp) $(resources) 
+	mkdir -p $(webdir)
+	$(EMCC) $(EMCCFLAGS) $(sources) -o $(webdir)/hra.html
+	cp $(srcdir)/hra.html $(webdir)
+
+#  cleanup
 
 clean:
 	$(RM) -r $(outdir)

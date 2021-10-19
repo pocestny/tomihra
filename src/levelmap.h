@@ -4,6 +4,7 @@
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_image.h>
 #include <cassert>
+#include <iostream>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -11,7 +12,7 @@
 struct Tile {
   uint32_t id;
   std::string tilesheet;
-  int x, y;  // absolute position in tilesheet 
+  int x, y;  // absolute position in tilesheet
   bool passable;
 };
 
@@ -52,8 +53,8 @@ class LevelMap {
            int _chunk_size = 4096);
   ~LevelMap();
 
-  const SDL_Rect* screen() const {return &_screen;}
-  const std::vector<uint32_t> layers(){return _layers;}
+  const SDL_Rect *screen() const { return &_screen; }
+  const std::vector<uint32_t> layers() { return _layers; }
 
   void addTiles(const std::vector<Tile> &t);
   void addTileSheet(std::string name, const std::string &data);
@@ -63,7 +64,12 @@ class LevelMap {
   inline int px_width() const { return tile_size * width; }
   inline int px_height() const { return tile_size * height; }
 
-  bool accessible(SDL_Rect *rect){return true;}
+  bool accessible(SDL_Rect *rect);
+
+  void printScreen() {
+    std::cout << "LevelMap::printScreen=[" << _screen.x << "," << _screen.y
+              << "," << _screen.w << "," << _screen.h << "]\n";
+  }
 };
 
 #endif

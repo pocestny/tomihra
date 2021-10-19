@@ -1,7 +1,6 @@
 #include "levelmap.h"
 #include <cassert>
 #include <iostream>
-
 using namespace std;
 
 LevelMap::LevelMap(SDL_Renderer *_renderer, int _tile_size, int _width,
@@ -74,6 +73,7 @@ void LevelMap::addTileMap(int layer, const std::string &data) {
 }
 
 void LevelMap::makeChunk(int x, int y) {
+  // cout<<"LevelMap::makeChunk("<<x<<","<<y<<")\n";
   if (chunks[x + y * chunk_pitch]) delete (chunks[x + y * chunk_pitch]);
   Chunk *c = new Chunk;
   c->px_x = x * chunk_size;
@@ -108,13 +108,18 @@ void LevelMap::makeChunk(int x, int y) {
         src.y += t.y;
         assert(SDL_BlitSurface(tilesheets[t.tilesheet], &src, tmp, &dst) == 0);
       }
-    assert(c->layers[layer] = SDL_CreateTextureFromSurface(renderer, tmp));
+    c->layers[layer] = SDL_CreateTextureFromSurface(renderer, tmp);
+    if (c->layers[layer] == nullptr) {
+      cout << "CreateTextureFromSurface failed: " << SDL_GetError() << endl;
+      assert(0);
+    }
     SDL_FreeSurface(tmp);
   }
   chunks[x + y * chunk_pitch] = c;
 }
 
 void LevelMap::render(int layer, const SDL_Rect *camera) {
+  // cout<<"LevelMap::render("<<layer<<",["<<camera->x<<","<<camera->y<<","<<camera->w<<","<<camera->h<<"]\n";
   for (int cx = (camera->x / chunk_size) * chunk_size;
        cx < camera->x + camera->w; cx += chunk_size)
     for (int cy = (camera->y / chunk_size) * chunk_size;
@@ -137,4 +142,18 @@ void LevelMap::render(int layer, const SDL_Rect *camera) {
                       .h = rect.h};
       SDL_RenderCopy(renderer, c->layers[layer], &src, &dst);
     }
+}
+
+bool LevelMap::accessible(SDL_Rect *rect) {
+  if (rect->x + rect->w > _screen.w) return false;
+  if (rect->y + rect->h > _screen.h) return false;
+  if (rect->x < 0) return false;
+  if (rect->y < 0) return false;
+  for (int x = (rect->x / tile_size) * tile_size; x < rect->x + rect->w;
+       x += tile_size)
+    for (int y = (rect->y / tile_size) * tile_size; y < rect->y + rect->h;
+         y += tile_size)
+      for (auto l : _layers)
+        if (!tile_at(l, x, y).passable) return false;
+  return true;
 }
