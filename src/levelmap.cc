@@ -11,6 +11,7 @@ LevelMap::LevelMap(SDL_Renderer *_renderer, int _tile_size, int _width,
       width{_width},
       height{_height},
       chunk_size{_chunk_size} {
+  _screen = {.x = 0, .y = 0, .w = px_width(), .h = px_height()};
   chunk_pitch = px_width() / chunk_size + 1;
   chunks.resize(chunk_pitch * (px_height() / chunk_size + 1), nullptr);
 }
@@ -86,13 +87,13 @@ void LevelMap::makeChunk(int x, int y) {
     assert(tmp = SDL_CreateRGBSurface(0, dx, dy, 32, 0xff000000, 0xff0000,
                                       0xff00, 0xff));
     SDL_Rect chunk_r = {.x = c->px_x, .y = c->px_y, .w = dx, .h = dy};
-    for (int tx = (c->px_x / tile_size) * tile_size; tx <= c->px_x + dx;
+    for (int tx = (c->px_x / tile_size) * tile_size; tx < c->px_x + dx;
          tx += tile_size)
-      for (int ty = (c->px_y / tile_size) * tile_size; ty <= c->px_y + dy;
+      for (int ty = (c->px_y / tile_size) * tile_size; ty < c->px_y + dy;
            ty += tile_size) {
         SDL_Rect tile_r = {.x = tx, .y = ty, .w = tile_size, .h = tile_size},
                  rect;
-        if (SDL_IntersectRect(&chunk_r, &tile_r, &rect) != SDL_TRUE) continue;
+        assert(SDL_IntersectRect(&chunk_r, &tile_r, &rect) == SDL_TRUE);
         SDL_Rect src = {.x = rect.x - tx,
                         .y = rect.y - ty,
                         .w = rect.w,
@@ -113,11 +114,11 @@ void LevelMap::makeChunk(int x, int y) {
   chunks[x + y * chunk_pitch] = c;
 }
 
-void LevelMap::render(int layer, SDL_Rect *camera) {
-  for (int cx = (camera->x / chunk_size) * chunk_size; cx <= camera->x + camera->w;
-       cx += chunk_size)
+void LevelMap::render(int layer, const SDL_Rect *camera) {
+  for (int cx = (camera->x / chunk_size) * chunk_size;
+       cx < camera->x + camera->w; cx += chunk_size)
     for (int cy = (camera->y / chunk_size) * chunk_size;
-         cy <= camera->y + camera->h; cy += chunk_size) {
+         cy < camera->y + camera->h; cy += chunk_size) {
       if (!chunks[chunk_at(cx, cy)])
         makeChunk(cx / chunk_size, cy / chunk_size);
       Chunk *c;
@@ -125,7 +126,7 @@ void LevelMap::render(int layer, SDL_Rect *camera) {
       assert(c->layers.count(layer) > 0);
       SDL_Rect chunk_r = {.x = cx, .y = cy, .w = chunk_size, .h = chunk_size},
                rect;
-      if(SDL_IntersectRect(&chunk_r, camera, &rect) != SDL_TRUE) continue;
+      assert(SDL_IntersectRect(&chunk_r, camera, &rect) == SDL_TRUE);
       SDL_Rect src = {.x = rect.x - cx,
                       .y = rect.y - cy,
                       .w = rect.w,

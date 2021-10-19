@@ -1,7 +1,7 @@
 #include "connector.h"
-#include "defines.h"
 #include "levelmap.h"
 #include "resources.h"
+
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_image.h>
 #include <cassert>
@@ -10,16 +10,27 @@
 using namespace std;
 
 struct Controller {
-  SDL_Window* window;
+  int maxFPS = 60;
+  int ticks_per_frame = (1000 / maxFPS);
+  const vector<SDL_Keycode> listened_keys{SDLK_x, SDLK_UP, SDLK_DOWN, SDLK_LEFT,
+                                          SDLK_RIGHT};
+  enum { KEY_x = 0, KEY_UP, KEY_DOWN, KEY_LEFT, KEY_RIGHT };
+  vector<bool> key_pressed, key_pressed_old;
+
+  SDL_Window* sdl_window;
   SDL_Renderer* renderer;
+  SDL_Rect window{.x = 0, .y = 0, .w = 800, .h = 600};
 
   Controller() {
+    key_pressed.resize(listened_keys.size(), false);
+    key_pressed_old.resize(listened_keys.size(), false);
     assert(SDL_Init(SDL_INIT_VIDEO) >= 0);
     assert(SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "1"));
-    assert(window = SDL_CreateWindow("hra", SDL_WINDOWPOS_UNDEFINED,
-                                     SDL_WINDOWPOS_UNDEFINED, window_width,
-                                     window_height, SDL_WINDOW_SHOWN));
-    assert(renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED));
+    assert(sdl_window = SDL_CreateWindow("hra", SDL_WINDOWPOS_UNDEFINED,
+                                         SDL_WINDOWPOS_UNDEFINED, window.w,
+                                         window.h, SDL_WINDOW_SHOWN));
+    assert(renderer =
+               SDL_CreateRenderer(sdl_window, -1, SDL_RENDERER_ACCELERATED));
     assert(IMG_Init(IMG_INIT_PNG) == IMG_INIT_PNG);
   }
 
@@ -28,28 +39,17 @@ struct Controller {
     bool quit = false;
     while (!quit) {
       uint32_t start = SDL_GetTicks();
-      Connector<int>::emit(this, "frame", 0);
+      key_pressed_old = key_pressed;
       while (SDL_PollEvent(&e) != 0) {
         if (e.type == SDL_KEYDOWN) {
-          switch (e.key.keysym.sym) {
-            case SDLK_x:
-              quit = true;
-              break;
-            case SDLK_UP:
-              Connector<int>::emit(this, "key", 1);
-              break;
-            case SDLK_DOWN:
-              Connector<int>::emit(this, "key", 2);
-              break;
-            case SDLK_LEFT:
-              Connector<int>::emit(this, "key", 3);
-              break;
-            case SDLK_RIGHT:
-              Connector<int>::emit(this, "key", 4);
-              break;
-          }
+          for (int i = 0; i < listened_keys.size(); i++)
+            if (e.key.keysym.sym == listened_keys[i]) key_pressed[i] = true;
+        } else if (e.type == SDL_KEYUP) {
+          for (int i = 0; i < listened_keys.size(); i++)
+            if (e.key.keysym.sym == listened_keys[i]) key_pressed[i] = false;
         }
       }
+      if (key_pressed[KEY_x]) return;
       SDL_RenderClear(renderer);
       Connector<int>::emit(this, "render", 0);
       SDL_RenderPresent(renderer);
@@ -61,59 +61,103 @@ struct Controller {
 
   ~Controller() {
     SDL_DestroyRenderer(renderer);
-    SDL_DestroyWindow(window);
+    SDL_DestroyWindow(sdl_window);
     IMG_Quit();
     SDL_Quit();
   }
 };
 
+class Sprite {
+ protected:
+  SDL_Renderer* renderer;
+  SDL_Rect _rect;
+  SDL_Texture* tx;
+
+ public:
+  Sprite(SDL_Renderer* _renderer, int w, int h)
+      : renderer{_renderer},
+        _rect{.x = 0, .y = 0, .w = w, .h = h},
+        tx{nullptr} {}
+  ~Sprite() {
+    if (tx) SDL_DestroyTexture(tx);
+  }
+  const SDL_Rect* rect() const { return &_rect; }
+  int cx() const { return _rect.x + _rect.h / 2; }
+  int cy() const { return _rect.y + _rect.w / 2; }
+  void moveTo(int x, int y) {
+    _rect.x = x;
+    _rect.y = y;
+  }
+  void addImage(const std::string& data) {
+    SDL_RWops* tmp;
+    SDL_Surface* surf;
+    assert(tmp = SDL_RWFromConstMem((const void*)data.data(), data.size()));
+    assert(surf = IMG_Load_RW(tmp, 1));
+    assert(surf->w == _rect.w);
+    assert(surf->h == _rect.h);
+    assert(tx = SDL_CreateTextureFromSurface(renderer, surf));
+    SDL_FreeSurface(surf);
+  }
+  void render(const SDL_Rect* camera) {
+    SDL_Rect src, dst;
+    if (SDL_IntersectRect(&_rect, camera, &src) == SDL_FALSE) return;
+    dst = src;
+    src.x -= _rect.x;
+    src.y -= _rect.y;
+    dst.x -= camera->x;
+    dst.y -= camera->y;
+    SDL_RenderCopy(renderer, tx, &src, &dst);
+  }
+};
+
+class Camera {
+ protected:
+  SDL_Rect rect;
+
+ public:
+  Camera(SDL_Rect _rect) : rect{_rect} {}
+  const SDL_Rect* operator()() const { return &rect; }
+  void center_at(int x, int y, const SDL_Rect* screen) {
+    rect.x = x - rect.w / 2;
+    if (rect.x < screen->x) rect.x = screen->x;
+    if (rect.x + rect.w > screen->x + screen->w)
+      rect.x = screen->x + screen->w - rect.w;
+    rect.y = y - rect.h / 2;
+    if (rect.y < screen->y) rect.y = screen->y;
+    if (rect.y + rect.h > screen->y + screen->h)
+      rect.y = screen->y + screen->h - rect.h;
+  }
+};
+
 int main(int argc, char** argv) {
   Controller c;
-  SDL_Rect hracpos = {.x = 10, .y = 10, .w = 40, .h = 40};
-  SDL_Rect camera = {.x = 0, .y = 0, .w = window_width, .h = window_height};
-  int dx = 0, dy = 0, r = 5;
+  LevelMap m(c.renderer, 32, 40, 40);
+  Camera camera(c.window);
+  Sprite p(c.renderer, 48, 48);
 
-  LevelMap m(c.renderer, 32, 40, 40, 128);
   m.addTiles({{0xff, "sheet", 0, 0, false},
               {0xffffff, "sheet", 0, 32, true},
               {0xff00ffff, "sheet", 0, 64}});
   m.addTileSheet("sheet", Level1Resources::sheet());
   m.addTileMap(0, Level1Resources::mapa());
 
-  Connector<int>::connect(&c, "frame", [&](int) { dx = dy = 0; });
-  Connector<int>::connect(&c, "key", [&](int x) {
-    switch (x) {
-      case 1:
-        dy = -r;
-        break;
-      case 2:
-        dy = r;
-        break;
-      case 3:
-        dx = -r;
-        break;
-      case 4:
-        dx = r;
-        break;
-    }
-  });
+  p.addImage(Level1Resources::sprite());
+
   Connector<int>::connect(&c, "render", [&](int) {
-    SDL_Rect npos = hracpos;
+    int dx = 0, dy = 0;
+    int r=5;
+    if (c.key_pressed[c.KEY_UP]) dy = -r;
+    if (c.key_pressed[c.KEY_DOWN]) dy = r;
+    if (c.key_pressed[c.KEY_LEFT]) dx = -r;
+    if (c.key_pressed[c.KEY_RIGHT]) dx = r;
+
+    SDL_Rect npos = *p.rect();
     npos.x += dx;
     npos.y += dy;
-    if (npos.x > 0 && npos.y > 0 && npos.x + npos.w < m.px_width() &&
-        npos.y + npos.h < m.px_height())
-      hracpos = npos;
-    camera.x = hracpos.x - window_width / 2;
-    if (camera.x < 0) camera.x = 0;
-    if (camera.x + camera.w > m.px_width()) camera.x = m.px_width() - camera.w;
-
-    camera.y = hracpos.y - window_height / 2;
-    if (camera.y < 0) camera.y = 0;
-    if (camera.y + camera.h > m.px_height())
-      camera.y = m.px_height() - camera.h;
-
-    m.render(0, &camera);
+    if (m.accessible(&npos)) p.moveTo(npos.x, npos.y);
+    camera.center_at(p.cx(), p.cy(), m.screen());
+    m.render(0, camera());
+    p.render(camera());
   });
   c.run();
 }
