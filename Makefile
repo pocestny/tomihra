@@ -1,56 +1,52 @@
-BINARY  := hra
-SOURCES := levelmap.cc main.cc sprite.cc
-HEADERS := base64.h connector.h controller.h hash.h levelmap.h sample_level.h sprite.h
-CXX     := clang++
-OUT     ?= build
-RES     := hrac.png tilemap.png tilesheet.png player_sheet.png
+BINARY     := hra
+SOURCES    := controller.cc levelmap.cc main.cc sprite.cc resources.cc sample_level.cc
+HEADERS    := base64.h connector.h controller.h hash.h levelmap.h sprite.h resources.h sample_level.h 
+OUTDIR     ?= build
+RESOURCES  := tilemap.png tilesheet.png player_sheet.png
 
 srcdir    ?= src
 resdir    ?= resources
 sources   := $(addprefix $(srcdir)/,$(SOURCES))
-outdir    := $(OUT)/linux
+outdir    := $(OUTDIR)/linux
+webdir    := $(OUTDIR)/web
 outbin    := $(outdir)/$(BINARY)
 objects   := $(addprefix $(outdir)/,$(SOURCES:.cc=.o))
+resources := $(addprefix $(resdir)/,$(RESOURCES))
+headers   := $(addprefix $(srcdir)/,$(HEADERS))
 
-CXXFLAGS := -I $(outdir) -O3 -g -std=c++20 -I $(srcdir)
-LDFLAGS  := -lSDL2 -lSDL2_image
+resource_compiler     := $(outdir)/resource_compiler
+resource_compiler_dir := resource_compiler
+resource_conf         := $(resdir)/resources.conf
 
-resourcesh:= $(outdir)/resources.h
-resconf   := $(resdir)/resources.conf
-rcomp     := $(outdir)/resource_compiler
-rcompdir  := resource_compiler
-resource_files := $(addprefix $(resdir)/,$(RES))
+CXX        := clang++
+CXXFLAGS   := -O3 -g -std=c++20 -I $(srcdir)
+LDFLAGS    := -lSDL2 -lSDL2_image -lSDL2_ttf
+EMCC       := emcc
+EMCCFLAGS  :=  -O3 -g -s ALLOW_MEMORY_GROWTH=1 -s USE_SDL=2 -s USE_SDL_IMAGE=2 -s SDL2_IMAGE_FORMATS='["png"]' -s USE_SDL_TTF=2 -I $(srcdir) -g -std=c++20
 
-webdir    := $(OUT)/web
-EMCC      := emcc
-EMCCFLAGS :=  -O3 -g -s ALLOW_MEMORY_GROWTH=1 -s USE_SDL=2 -s USE_SDL_IMAGE=2 -s SDL2_IMAGE_FORMATS='["png"]' -I $(outdir) -I $(srcdir) -g -std=c++20
 
-all: $(rcomp) $(outbin)
+all: $(resource_compiler) $(outbin)
 
-#  resources
-
-$(rcomp): 
+$(resource_compiler):
 	mkdir -p $(outdir)
-	make -C $(rcompdir) OUT=../$(outdir)
+	make -C $(resource_compiler_dir) OUT=../$(outdir)
 
-$(resourcesh): $(resconf) $(resource_files)
-	$(rcomp) -d $(resdir) -f $(resconf) -o $@
-
+$(srcdir)/resources.cc $(srcdir)/resources.h: $(resource_compiler) $(resources) $(resource_conf)
+	$(resource_compiler) -d $(resdir) -f $(resource_conf) -o $(srcdir)/resources
 
 #  linux binary
 
-$(outbin): $(resourcesh) $(objects) $(addprefix $(srcdir)/,$(HEADERS))
+$(outbin): $(objects) $(headers) 
 	mkdir -p $(outdir)
 	$(CXX) $(CXXFLAGS) -o $@ $(objects) $(LDFLAGS)
 	cp $(outbin) .
 
-$(outdir)/%.o: $(srcdir)/%.cc 
+$(outdir)/%.o: $(srcdir)/%.cc $(headers) 
 	$(CXX) $(CXXFLAGS) -o $@ -c $<
-
 
 #  web
 
-web: $(rcomp) $(resources) 
+web: $(sources) $(headers)
 	mkdir -p $(webdir)
 	$(EMCC) $(EMCCFLAGS) $(sources) -o $(webdir)/hra.html
 	cp $(srcdir)/hra.html $(webdir)

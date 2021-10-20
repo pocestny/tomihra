@@ -1,7 +1,8 @@
 /*
  * parse input ini file (default "resources.conf", change with -f <name> )
- * create output (default "resources.h", change with -o <name> ) file with
+ * create output (default "resources" (h,cc), change with -o <name> ) file with
  * resource classes
+ * resources are located in direcotry . (change with -d <name>)
  */
 #include <cstdio>
 #include <cstring>
@@ -9,6 +10,7 @@
 #include <iostream>
 #include <sstream>
 #include <unordered_map>
+#include <sstream>
 
 #include "INIReader.h"
 #include "base64.h"
@@ -17,7 +19,7 @@ using namespace std;
 
 int main(int argc, char **argv) {
   string ini = "resources.conf";
-  string out = "resources.h";
+  string out = "resources";
   string dir = ".";
 
   for (int i = 1; i < argc; i++)
@@ -35,11 +37,29 @@ int main(int argc, char **argv) {
     exit(1);
   }
 
-  fstream f(out, fstream::out);
+  stringstream name;
+  name<<out<<".h";
+  fstream f(name.str(), fstream::out);
   f << "#ifndef ___RESOURCES___" << endl;
   f << "#define ___RESOURCES___" << endl << endl;
-  f << "#include <string>" << endl << endl;
+  f << "#include <string>" << endl;
   f << "#include \"base64.h\"" << endl << endl;
+
+  for (auto section : reader.GetSections()) {
+    f << "namespace " << section << " {" << endl;
+    for (auto field :  reader.GetFields(section)) {
+      f << "  std::string " << field << "();" << endl;
+    }
+    f << "};" << endl << endl;
+  }
+  f << "#endif" << endl;
+  f.close();
+
+  name.str("");
+  name<<out<<".cc";
+
+  f.open(name.str(), fstream::out);
+  f << "#include \"resources.h\"" << endl << endl;
 
   for (auto section : reader.GetSections()) {
     f << "namespace " << section << " {" << endl;
@@ -70,6 +90,6 @@ int main(int argc, char **argv) {
     }
     f << "};" << endl << endl;
   }
-  f << "#endif" << endl;
   f.close();
+
 }

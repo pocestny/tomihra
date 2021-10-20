@@ -45,7 +45,8 @@ Tile LevelMap::tile_at(int layer, int px_x, int px_y) const {
   int tx = px_x / tile_size, ty = px_y / tile_size;
   uint32_t clr = clr_at(layer, tx, ty);
 
-  // inherited classes do some recoding here
+  // inherited classes may do some recoding here
+  // for now clr=id
 
   assert(tiles.count(clr) > 0);
   return tiles.at(clr);
@@ -53,6 +54,14 @@ Tile LevelMap::tile_at(int layer, int px_x, int px_y) const {
 
 void LevelMap::addTiles(const std::vector<Tile> &t) {
   for (auto x : t) tiles[x.id] = x;
+}
+
+void LevelMap::addTiles(std::string sheet, int pitch, int tilesize,
+                        const std::vector<uint32_t> &t,
+                        const std::unordered_set<uint32_t> solid) {
+  for (auto x : t)
+    tiles[x] = Tile{x, sheet, tilesize * ((int)x % pitch),
+                    tilesize * ((int)x / pitch), (solid.count(x) == 0)};
 }
 
 void LevelMap::addTileSheet(std::string name, const std::string &data) {

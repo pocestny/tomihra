@@ -2,6 +2,8 @@
 #include "sample_level.h"
 
 #include <cassert>
+#include <time.h>
+#include <cstdlib>
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
@@ -22,6 +24,7 @@ EM_BOOL iteration(double time, void* userData) {
 #endif
 
 int main(int argc, char** argv) {
+  srandom(time(NULL));
   controller = new Controller("hra",1200,800);
   SampleLevel* level = new SampleLevel(controller);
   Connector<int>::connect(controller, "frame", [level](int) {level->render_frame();});

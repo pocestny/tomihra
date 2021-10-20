@@ -5,7 +5,7 @@
 using namespace std;
 
 Sprite::Sprite(SDL_Renderer* _renderer, int w, int h)
-    : renderer{_renderer}, _rect{.x = 0, .y = 0, .w = w, .h = h} {}
+    : renderer{_renderer}, _rect{.x = 0, .y = 0, .w = w, .h = h},_collision_rect{_rect} {}
 
 Sprite::~Sprite() {
   for (auto x : charsheets) SDL_DestroyTexture(x.second);
@@ -44,6 +44,7 @@ void Sprite::render(const SDL_Rect* camera) {
   if (f == anim.size()) {
     current_animation = "";
     Connector<string>::emit(this,"animation_ended", current_animation);
+    render(camera);
     return;
   }
   assert(charsheets.count(anim[f].charsheet) > 0);

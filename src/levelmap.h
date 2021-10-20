@@ -7,6 +7,7 @@
 #include <iostream>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 struct Tile {
@@ -46,7 +47,7 @@ class LevelMap {
 
   // color at given position in tilemap
   uint32_t clr_at(int layer, int tx, int ty) const;
-  
+
   // tile at given pixel coordinates
   Tile virtual tile_at(int layer, int px_x, int px_y) const;
 
@@ -63,6 +64,10 @@ class LevelMap {
   const std::vector<uint32_t> layers() { return _layers; }
 
   void addTiles(const std::vector<Tile> &t);
+  void addTiles(std::string sheet, int pitch, int tilesize,
+                const std::vector<uint32_t> &t,
+                const std::unordered_set<uint32_t> solid = {});
+
   void addTileSheet(std::string name, const std::string &data);
   void addTileMap(int layer, const std::string &data);
 
