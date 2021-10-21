@@ -74,6 +74,8 @@ struct Controller {
                        SDL_Color color = {0, 0, 0}, std::string font = "") {
     renderText(prepareText(text, color, font), x, y);
   }
+  int textWidth(std::string font, const char* text);
+  int textHeight(std::string font);
   uint32_t iteration();
   void run();
   ~Controller();

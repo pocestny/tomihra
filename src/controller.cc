@@ -80,7 +80,7 @@ Controller::Controller(const string& window_name, int width, int height)
              SDL_CreateRenderer(sdl_window, -1, SDL_RENDERER_ACCELERATED));
   assert(IMG_Init(IMG_INIT_PNG) == IMG_INIT_PNG);
   assert(TTF_Init() != -1);
-  SDL_SetRenderDrawBlendMode(renderer,SDL_BLENDMODE_BLEND);
+  SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
 
   loadFont("roboto-regular", Fonts::roboto_regular(), 17);
   loadFont("roboto-bold", Fonts::roboto_bold(), 17);
@@ -119,6 +119,20 @@ void Controller::renderText(SDL_Surface* textSurface, int x, int y) {
   SDL_RenderCopy(renderer, texture, NULL, &renderQuad);
   SDL_DestroyTexture(texture);
   SDL_FreeSurface(textSurface);
+}
+
+int Controller::textWidth(std::string font, const char* text) {
+  if (fonts.count(font) == 0) font = defaultFont;
+  int w, h;
+  TTF_SizeText(fonts[font], text, &w, &h);
+  return w;
+}
+
+int Controller::textHeight(std::string font) {
+  if (fonts.count(font) == 0) font = defaultFont;
+  int w, h;
+  TTF_SizeText(fonts[font], "SampleText", &w, &h);
+  return h;
 }
 
 uint32_t Controller::iteration() {

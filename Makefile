@@ -22,11 +22,11 @@ resource_conf         := $(resdir)/resources.conf
 
 CXX        := clang++
 CXXFLAGS   := -O3 -g -std=c++20 -I $(srcdir)
-LDFLAGS    := -lSDL2 -lSDL2_image -lSDL2_ttf
+LDFLAGS    := -lSDL2 -lSDL2_image -lSDL2_ttf -lm
 EMCC       := emcc
 EMCCFLAGS  := -O3 -g -s ALLOW_MEMORY_GROWTH=1 -s USE_SDL=2 -s USE_SDL_IMAGE=2\
 							-s SDL2_IMAGE_FORMATS='["png"]' -s USE_SDL_TTF=2\
-							-I $(srcdir) -g -std=c++20
+							-I $(srcdir) -g -std=c++20 -lm
 
 
 all: $(resource_compiler) $(outbin)

@@ -41,24 +41,26 @@ struct SplashScreen {
   void render() {
     SDL_RenderCopy(c->renderer, splash_image, NULL, NULL);
     auto ctx = controller->mu_ctx();
-    mu_Style s,*olds;
-    olds=ctx->style;
-    s=*olds;
-    s.font=(void*)"large";
-    s.padding=30;
-    s.colors[MU_COLOR_BUTTON]={50,200,200,100};
-    s.colors[MU_COLOR_BUTTONHOVER]={50,200,200,150};
-    ctx->style=&s;
-    if (mu_begin_window_ex(
-            ctx, "menu", mu_rect(c->window.w/2-300, 300, 600, 400),
-            MU_OPT_NOCLOSE | MU_OPT_NORESIZE | MU_OPT_NOFRAME | MU_OPT_NOTITLE )) {
+    mu_Style s, *olds;
+    olds = ctx->style;
+    s = *olds;
+    s.font = (void *)"large";
+    s.padding = 30;
+    s.colors[MU_COLOR_BUTTON] = {50, 200, 200, 100};
+    s.colors[MU_COLOR_BUTTONHOVER] = {50, 200, 200, 150};
+    s.colors[MU_COLOR_BUTTONFOCUS] = {50, 200, 200, 150};
+    ctx->style = &s;
+    if (mu_begin_window_ex(ctx, "menu",
+                           mu_rect(c->window.w / 2 - 300, 300, 600, 400),
+                           MU_OPT_NOCLOSE | MU_OPT_NORESIZE | MU_OPT_NOFRAME |
+                               MU_OPT_NOTITLE)) {
       mu_layout_row(ctx, 1, (int[]){-1}, 0);
       if (mu_button(ctx, "Hrať")) {
         Connector<int>::emit(this, "finished", 0);
       }
       mu_end_window(ctx);
     }
-    ctx->style=olds;
+    ctx->style = olds;
   }
 };
 
@@ -76,6 +78,7 @@ struct State {
       Connector<int>::disconnect(controller, "frame", splash_conn);
       delete (splash);
       splash = nullptr;
+      SDL_ShowCursor(SDL_DISABLE);
       Connector<int>::connect(controller, "frame", [level = this->level](int) {
         level->render_frame();
       });
@@ -93,16 +96,12 @@ static int mu_text_width(mu_Font font, const char *text, int len) {
   string tt(text);
   if (len < tt.size()) tt.resize(len);
   if (font) ff = string((const char *)(font));
-  int w, h;
-  TTF_SizeText(controller->fonts[ff], tt.data(), &w, &h);
-  return w;
+  return controller->textWidth(ff, tt.data());
 }
 static int mu_text_height(mu_Font font) {
   string ff = controller->defaultFont;
   if (font) ff = string((const char *)(font));
-  int w, h;
-  TTF_SizeText(controller->fonts[ff], "SampleText", &w, &h);
-  return h;
+  return controller->textHeight(ff);
 }
 
 int main(int argc, char **argv) {
