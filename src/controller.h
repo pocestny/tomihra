@@ -1,10 +1,12 @@
 #ifndef __CONTROLLER_H__
 #define __CONTROLLER_H__
 #include "connector.h"
+#include "microui.h"
 #include "resources.h"
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_image.h>
 #include <SDL2/SDL_ttf.h>
+#include <array>
 #include <cassert>
 #include <iostream>
 #include <sstream>
@@ -20,6 +22,16 @@ class Camera {
   const SDL_Rect* operator()() const { return &rect; }
   void center_at(int x, int y, const SDL_Rect* screen);
   void print();
+};
+
+struct Controller;
+struct MicroUI {
+  std::array<char, 256> button_map, key_map;
+  mu_Context* mu_ctx;
+  bool on;
+
+  MicroUI();
+  void processCommands(Controller* ctrl);
 };
 
 struct Controller {
@@ -43,20 +55,25 @@ struct Controller {
 
   SDL_Window* sdl_window;
   SDL_Renderer* renderer;
-  SDL_Texture *splash_image;
-
   SDL_Rect window;
+  SDL_Color bg;
+
+  MicroUI microUi;
 
   std::unordered_map<std::string, TTF_Font*> fonts;
   std::vector<std::string> font_data;
 
   Controller(const std::string& window_name, int width, int height);
+  inline mu_Context* const mu_ctx() const { return microUi.mu_ctx; }
+
   void loadFont(std::string name, std::string data, int size);
-  SDL_Surface* prepareText(
-      const std::string& text, SDL_Color color = {0, 0, 0},
-      std::string font = "");          // allocates the surface
-  void renderText(SDL_Surface*, int x, int y);  // frees the sufrace
-  void renderStat();
+  SDL_Surface* prepareText(const char* text, SDL_Color color = {0, 0, 0},
+                           std::string font = "");  // allocates the surface
+  void renderText(SDL_Surface*, int x, int y);      // frees the sufrace
+  inline void drawText(const char* text, int x, int y,
+                       SDL_Color color = {0, 0, 0}, std::string font = "") {
+    renderText(prepareText(text, color, font), x, y);
+  }
   uint32_t iteration();
   void run();
   ~Controller();

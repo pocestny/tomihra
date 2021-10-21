@@ -90,11 +90,18 @@ void SampleLevel::render_frame() {
   npos.y += dy;
   cpos.x += dx;
   cpos.y += dy;
-  //cout<<"npos: ["<<npos.x<<","<<npos.y<<","<<npos.w<<","<<npos.h<<"] ";
-  //cout<<"cpos: ["<<cpos.x<<","<<cpos.y<<","<<cpos.w<<","<<cpos.h<<"] \n";
+ //  cout<<"npos: ["<<npos.x<<","<<npos.y<<","<<npos.w<<","<<npos.h<<"] ";
+ //  cout<<"cpos: ["<<cpos.x<<","<<cpos.y<<","<<cpos.w<<","<<cpos.h<<"] \n";
 
   if (m->accessible(&cpos)) p->moveTo(npos.x, npos.y);
   camera->center_at(p->cx(), p->cy(), m->screen());
   m->render(0, (*camera)());
   p->render((*camera)());
+
+#ifdef __EMSCRIPTEN__
+  auto tmp = ctrl->prepareText("Q for run");
+#else
+  auto tmp = ctrl->prepareText("Q for run, X for exit");
+#endif
+  ctrl->renderText(tmp, 10, (ctrl->window.h - tmp->h) - 10);
 }

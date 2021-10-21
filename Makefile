@@ -1,6 +1,8 @@
 BINARY     := hra
-SOURCES    := controller.cc levelmap.cc main.cc sprite.cc resources.cc sample_level.cc
-HEADERS    := base64.h connector.h controller.h hash.h levelmap.h sprite.h resources.h sample_level.h 
+SOURCES    := controller.cc levelmap.cc main.cc sprite.cc resources.cc\
+							microui.cc sample_level.cc
+HEADERS    := base64.h connector.h controller.h hash.h levelmap.h sprite.h\
+							resources.h microui.h sample_level.h 
 OUTDIR     ?= build
 RESOURCES  := tilemap.png tilesheet.png player_sheet.png
 
@@ -22,7 +24,9 @@ CXX        := clang++
 CXXFLAGS   := -O3 -g -std=c++20 -I $(srcdir)
 LDFLAGS    := -lSDL2 -lSDL2_image -lSDL2_ttf
 EMCC       := emcc
-EMCCFLAGS  :=  -O3 -g -s ALLOW_MEMORY_GROWTH=1 -s USE_SDL=2 -s USE_SDL_IMAGE=2 -s SDL2_IMAGE_FORMATS='["png"]' -s USE_SDL_TTF=2 -I $(srcdir) -g -std=c++20
+EMCCFLAGS  := -O3 -g -s ALLOW_MEMORY_GROWTH=1 -s USE_SDL=2 -s USE_SDL_IMAGE=2\
+							-s SDL2_IMAGE_FORMATS='["png"]' -s USE_SDL_TTF=2\
+							-I $(srcdir) -g -std=c++20
 
 
 all: $(resource_compiler) $(outbin)
