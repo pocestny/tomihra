@@ -60,6 +60,19 @@ bool LevelMap::isCollision(int l, uint32_t v, SDL_Rect *rect) {
   return false;
 }
 
+vector<uint32_t> LevelMap::getCollisions(int l, SDL_Rect *rect) {
+  vector<uint32_t> res;
+  for (int x = (rect->x / tile_size); x < (rect->x + rect->w) / tile_size; x++)
+    for (int y = (rect->y / tile_size); y < (rect->y + rect->h) / tile_size;
+         y++) {
+      int i = y * width + x;
+      if (i < 0 || i > collisionLayers[l].size()) continue;
+      uint32_t w = collisionLayers[l][i];
+      if (w > 0) res.push_back(w);
+    }
+  return res;
+}
+
 int LevelMap::chunk_at(int px_x, int px_y) const {
   if (px_x < 0) px_x = 0;
   if (px_x > _screen.w) px_x = _screen.w;

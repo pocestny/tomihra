@@ -40,7 +40,7 @@ $(srcdir)/resources.cc $(srcdir)/resources.h: $(resource_compiler) $(resources) 
 
 #  linux binary
 
-$(outbin): $(objects) $(headers) 
+$(outbin): $(objects) $(headers) $(resources)
 	mkdir -p $(outdir)
 	$(CXX) $(CXXFLAGS) -o $@ $(objects) $(LDFLAGS)
 	cp $(outbin) .

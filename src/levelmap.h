@@ -80,6 +80,7 @@ class LevelMap {
 
   bool accessible(SDL_Rect *rect); // are all tiles accessible?
   bool isCollision(int l,uint32_t v, SDL_Rect *rect); // is there a collision without value v?
+  std::vector<uint32_t> getCollisions(int l, SDL_Rect *rect); // get all collision values
 
   void clearCollisionLayer(int l);
   void fillCollisionLayer(int l, uint32_t v, SDL_Rect *rect);

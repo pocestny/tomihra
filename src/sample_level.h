@@ -13,7 +13,7 @@ struct Player {
   bool facing_right, walking;
   std::function<void(std::string)> start_new;
   Player(Controller *ctrl);
-  void processInput(Controller *ctrl, Camera *camera, LevelMap *m);
+  uint32_t processInput(Controller *ctrl, Camera *camera, LevelMap *m);
 };
 
 struct Monster {
@@ -34,9 +34,11 @@ struct Brandy {
 };
 
 struct SampleLevel {
+  bool barrier,brandyfirst;
   Controller *ctrl;
   LevelMap *m;
   Camera *camera;
+  Sprite *strom;
   Player *p;
   std::vector<Monster *> monsters;
   std::set<Monster *> known;
