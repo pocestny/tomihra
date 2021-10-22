@@ -3,6 +3,7 @@
 
 #include <cassert>
 #include <cstdlib>
+#include <memory>
 #include <time.h>
 
 #ifdef __EMSCRIPTEN__
@@ -14,6 +15,7 @@
 
 using namespace std;
 
+typedef enum { S_MENU = 0, S_LEVEL1, S_END } state_t;
 Controller *controller;
 
 #ifdef __EMSCRIPTEN__
@@ -23,11 +25,11 @@ EM_BOOL iteration(double time, void *userData) {
 }
 #endif
 
-struct SplashScreen {
+struct MainMenu {
   SDL_Texture *splash_image;
   Controller *c;
 
-  SplashScreen(Controller *_c) : c{_c} {
+  MainMenu(Controller *_c) : c{_c} {
     c->microUi.on = true;
     SDL_RWops *rw;
     SDL_Surface *srf;
@@ -37,7 +39,9 @@ struct SplashScreen {
     splash_image = SDL_CreateTextureFromSurface(c->renderer, srf);
     SDL_FreeSurface(srf);
   }
-  ~SplashScreen() { SDL_DestroyTexture(splash_image); }
+
+  ~MainMenu() { SDL_DestroyTexture(splash_image); }
+
   void render() {
     SDL_RenderCopy(c->renderer, splash_image, NULL, NULL);
     auto ctx = controller->mu_ctx();
@@ -56,7 +60,11 @@ struct SplashScreen {
                                MU_OPT_NOTITLE)) {
       mu_layout_row(ctx, 1, (int[]){-1}, 0);
       if (mu_button(ctx, "Hrať")) {
-        Connector<int>::emit(this, "finished", 0);
+        Connector<state_t>::emit(this, "selected", S_LEVEL1);
+      }
+      if (mu_button(ctx, "Koniec") ||
+          controller->key_pressed[Controller::KEY_x]) {
+        Connector<state_t>::emit(this, "selected", S_END);
       }
       mu_end_window(ctx);
     }
@@ -65,29 +73,79 @@ struct SplashScreen {
 };
 
 struct State {
-  SplashScreen *splash;
-  SampleLevel *level;
-  int splash_conn;  // connection to splash screen
+// where the frames from controller go
+#define direct_frames_to(x)                                 \
+  frame_conn = Connector<int>::connect(controller, "frame", \
+                                       [this](int) { x->render(); })
+
+  unique_ptr<MainMenu> menu;
+  unique_ptr<SampleLevel> level1;
+  int frame_conn;  // connection from controller frame
+
+  state_t state;
+  SDL_Texture *splash_image;
+
+  void showSplash() {
+    SDL_SetRenderDrawColor(controller->renderer, 0, 0, 0, 255);
+    SDL_RenderClear(controller->renderer);
+    SDL_RenderCopy(controller->renderer, splash_image, NULL, NULL);
+    SDL_RenderPresent(controller->renderer);
+  }
 
   State() {
-    splash = new SplashScreen(controller);
-    level = new SampleLevel(controller);
+    {
+      SDL_RWops *rw;
+      SDL_Surface *srf;
+      string data = Splash::image();
+      assert(rw = SDL_RWFromConstMem((const void *)data.data(), data.size()));
+      assert(srf = IMG_Load_RW(rw, 1));
+      splash_image = SDL_CreateTextureFromSurface(controller->renderer, srf);
+      SDL_FreeSurface(srf);
+    }
 
-    // when splash screen finishes, start level
-    Connector<int>::connect(splash, "finished", [this](int) {
-      Connector<int>::disconnect(controller, "frame", splash_conn);
-      delete (splash);
-      splash = nullptr;
-      SDL_ShowCursor(SDL_DISABLE);
-      Connector<int>::connect(controller, "frame", [level = this->level](int) {
-        level->render_frame();
-      });
-    });
+    menu = make_unique<MainMenu>(controller);
+    level1 = make_unique<SampleLevel>(controller);
+    state = S_MENU;
+    showSplash();
 
-    // events from controller are received by splash screen
-    splash_conn = Connector<int>::connect(
-        controller, "frame",
-        [splash = this->splash](int) { splash->render(); });
+    level1->prepare();
+
+    Connector<int>::connect("LevelMap::makeChunkBegin",[this](int){
+        showSplash();
+        });
+
+    // when level 1 ends, go to menu
+    Connector<int>::connect(level1.get(), "finished",
+                            [this](int) { setState(S_MENU); });
+
+    // handle menu selections
+    Connector<state_t>::connect(menu.get(), "selected",
+                                [this](state_t item) { setState(item); });
+
+    // start with events from controller directed to menu
+    direct_frames_to(menu);
+  }
+
+  void setState(state_t newstate) {
+    Connector<int>::disconnect(controller, "frame", frame_conn);
+
+    switch (newstate) {
+      case S_MENU:
+        SDL_ShowCursor(SDL_ENABLE);
+        controller->key_pressed[Controller::KEY_x] = false;
+        direct_frames_to(menu);
+        break;
+      case S_LEVEL1:
+        SDL_ShowCursor(SDL_DISABLE);
+        direct_frames_to(level1);
+        break;
+      case S_END:
+#ifdef __EMSCRIPTEN__
+        emscripten_cancel_main_loop();
+#else
+        exit(0);
+#endif
+    }
   }
 };
 
@@ -113,7 +171,9 @@ int main(int argc, char **argv) {
   // cout << "state initialized\n";
 #ifdef __EMSCRIPTEN__
   emscripten_request_animation_frame_loop(iteration, 0);
+  emscripten_force_exit(0);
 #else
   controller->run();
 #endif
+  return 0;
 }

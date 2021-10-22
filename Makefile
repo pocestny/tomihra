@@ -4,7 +4,7 @@ SOURCES    := controller.cc levelmap.cc main.cc sprite.cc resources.cc\
 HEADERS    := base64.h connector.h controller.h hash.h levelmap.h sprite.h\
 							resources.h microui.h sample_level.h 
 OUTDIR     ?= build
-RESOURCES  := tilemap.png tilesheet.png player_sheet.png
+RESOURCES  := tilemap.png tilesheet.png player_sheet.png splash.png
 
 srcdir    ?= src
 resdir    ?= resources

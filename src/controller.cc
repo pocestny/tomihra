@@ -33,6 +33,13 @@ MicroUI::MicroUI() : on{false} {
   key_map[SDLK_RALT & 0xff] = MU_KEY_ALT;
   key_map[SDLK_RETURN & 0xff] = MU_KEY_RETURN;
   key_map[SDLK_BACKSPACE & 0xff] = MU_KEY_BACKSPACE;
+  
+  mu_ctx = new (mu_Context);
+  mu_init(mu_ctx);
+}
+
+MicroUI::~MicroUI() {
+  delete mu_ctx;
 }
 
 void MicroUI::processCommands(Controller* ctrl) {
@@ -87,9 +94,6 @@ Controller::Controller(const string& window_name, int width, int height)
   loadFont("large", Fonts::roboto_bold(), 25);
   defaultFont = "roboto-regular";
 
-  microUi.mu_ctx = new (mu_Context);
-  mu_init(microUi.mu_ctx);
-  microUi.on = false;
 }
 
 void Controller::loadFont(std::string name, std::string data, int size) {
@@ -104,7 +108,7 @@ SDL_Surface* Controller::prepareText(const char* text, SDL_Color color,
                                      string font) {
   SDL_Surface* textSurface;
   if (fonts.count(font) == 0) font = defaultFont;
-  if (!(textSurface = TTF_RenderUTF8_Solid(fonts[font], text, color))) {
+  if (!(textSurface = TTF_RenderUTF8_Blended(fonts[font], text, color))) {
     cerr << "Unable to render text surface! SDL_ttf Error: " << TTF_GetError()
          << endl;
     assert(0);
@@ -205,7 +209,6 @@ void Controller::run() {
   bool quit = false;
   while (!quit) {
     uint32_t time = iteration();
-    if (key_pressed[KEY_x]) return;
     if (time < ticks_per_frame) SDL_Delay(ticks_per_frame - time);
   }
 }

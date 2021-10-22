@@ -33,6 +33,7 @@ class LevelMap {
   SDL_Renderer *renderer;  // not owned
 
   int tile_size, width, height;  // dimensions in number of tiles
+  std::unordered_map<int,std::vector<uint32_t>> collisionLayers;
   std::unordered_map<int, SDL_Surface *>
       tilemaps;  // render layer -> rgba8 surface of tiles (coded as colors)
 
@@ -60,6 +61,7 @@ class LevelMap {
            int _chunk_size = 2048);
   ~LevelMap();
 
+  const int chunkSize() const {return chunk_size;}
   const SDL_Rect *screen() const { return &_screen; }
   const std::vector<uint32_t> layers() { return _layers; }
 
@@ -74,8 +76,13 @@ class LevelMap {
   void render(int layer, const SDL_Rect *camera);
   inline int px_width() const { return tile_size * width; }
   inline int px_height() const { return tile_size * height; }
+  void makeChunksAt(SDL_Rect *);
 
-  bool accessible(SDL_Rect *rect);
+  bool accessible(SDL_Rect *rect); // are all tiles accessible?
+  bool isCollision(int l,uint32_t v, SDL_Rect *rect); // is there a collision without value v?
+
+  void clearCollisionLayer(int l);
+  void fillCollisionLayer(int l, uint32_t v, SDL_Rect *rect);
 
   void printScreen() {
     std::cout << "LevelMap::printScreen=[" << _screen.x << "," << _screen.y

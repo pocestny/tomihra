@@ -75,11 +75,13 @@ void Player::processInput(Controller *ctrl, Camera *camera, LevelMap *m) {
   npos.y += dy;
   cpos.x += dx;
   cpos.y += dy;
-  if (m->accessible(&cpos)) p->moveTo(npos.x, npos.y);
+  if (m->accessible(&cpos) && (!m->isCollision(0, id, &cpos)))
+    p->moveTo(npos.x, npos.y);
   camera->center_at(p->cx(), p->cy(), m->screen());
 }
 
-Monster::Monster(Controller *ctrl, LevelMap *m, string _name) : name{_name} {
+Monster::Monster(Controller *ctrl, LevelMap *m, string _name, uint32_t _id)
+    : id{_id}, name{_name} {
   b = new Sprite(ctrl->renderer, 40, 40);
   b->addCharsheet("c1", SampleLevelResources::bubo());
   b->addAnimation("idle", {{"c1", 0, 0, 0xffffffff}});
@@ -91,21 +93,47 @@ Monster::Monster(Controller *ctrl, LevelMap *m, string _name) : name{_name} {
 }
 
 void Monster::move(Controller *ctrl, LevelMap *m) {
-  while (1) {
-    SDL_Rect r = *(b->rect());
-    double a = sqrt(
-        18.0f / (double)((tx - r.x) * (tx - r.x) + (ty - r.y) * (ty - r.y)));
+  SDL_Rect r = *(b->rect());
+  double a =
+      sqrt(18.0f / (double)((tx - r.x) * (tx - r.x) + (ty - r.y) * (ty - r.y)));
 
-    r.x += a * (tx - r.x);
-    r.y += a * (ty - r.y);
+  r.x += a * (tx - r.x);
+  r.y += a * (ty - r.y);
 
-    if (m->accessible(&r) && (abs(r.x - tx) > 3) && (abs(r.y - ty) > 3)) {
-      b->moveTo(r.x, r.y);
-      break;
-    } else {
-      tx = random() % m->px_width();
-      ty = random() % m->px_height();
-    }
+  if (m->accessible(&r) && (!m->isCollision(0, id, &r)) &&
+      (abs(r.x - tx) > 3) && (abs(r.y - ty) > 3)) {
+    b->moveTo(r.x, r.y);
+  } else {
+    tx = random() % m->px_width();
+    ty = random() % m->px_height();
+  }
+}
+
+Brandy::Brandy(Controller *ctrl, LevelMap *m) {
+  b = new Sprite(ctrl->renderer, 50, 40);
+  b->addCharsheet("c1", SampleLevelResources::brandy());
+  b->addAnimation("idle", {{"c1", 0, 0, 0xffffffff}});
+  do b->moveTo(random() % m->px_width(), random() % m->px_height());
+  while (!m->accessible(b->rect()));
+  b->startAnimation("idle");
+  tx = random() % m->px_width();
+  ty = random() % m->px_height();
+}
+
+void Brandy::move(Controller *ctrl, LevelMap *m) {
+  SDL_Rect r = *(b->rect());
+  double a =
+      sqrt(1.7f / (double)((tx - r.x) * (tx - r.x) + (ty - r.y) * (ty - r.y)));
+
+  r.x += a * (tx - r.x);
+  r.y += a * (ty - r.y);
+
+  if (m->accessible(&r) && (!m->isCollision(0, id, &r)) &&
+      (abs(r.x - tx) > 30) && (abs(r.y - ty) > 30)) {
+    b->moveTo(r.x, r.y);
+  } else {
+    tx = random() % m->px_width();
+    ty = random() % m->px_height();
   }
 }
 
@@ -113,17 +141,21 @@ SampleLevel::SampleLevel(Controller *_ctrl) : ctrl{_ctrl} {
   camera = new Camera(ctrl->window);
 
   // map
-  m = new LevelMap(ctrl->renderer, 16, 256, 256, 4096);
+  m = new LevelMap(ctrl->renderer, 16, 256, 256, 1024);
   m->addTiles("t1", 16, 16, {0,  1,  2,  4,  6,  10, 11, 16, 17, 18, 20,
                              21, 22, 32, 33, 34, 36, 37, 38, 42, 43, 49,
                              51, 52, 56, 65, 67, 68, 72, 81, 83, 84, 88},
               {21, 83, 88, 42, 43});
   m->addTileSheet("t1", SampleLevelResources::tilesheet());
   m->addTileMap(0, SampleLevelResources::mapa());
+  m->clearCollisionLayer(0);
 
   p = new Player(ctrl);
+  uint32_t id = 3;
   for (string x : {"Uňu", "Kuňu", "Ňuňu", "Huňu", "Žuňu", "Kleofáš"})
-    monsters.push_back(new Monster(ctrl, m, x));
+    monsters.push_back(new Monster(ctrl, m, x, id++));
+
+  b = new Brandy(ctrl, m);
 }
 
 double SampleLevel::dist2(Sprite *a, Sprite *b) {
@@ -157,12 +189,19 @@ void SampleLevel::msg(mu_Context *ctx, SDL_Rect *r, std::string title,
   ctx->style = olds;
 }
 
-void SampleLevel::render_frame() {
+void SampleLevel::render() {
+  if (ctrl->key_pressed[Controller::KEY_x]) {
+    Connector<int>::emit(this, "finished", 0);
+    return;
+  }
+
   p->processInput(ctrl, camera, m);
+  b->move(ctrl, m);
+  for (auto b : monsters) b->move(ctrl, m);
+
   m->render(0, (*camera)());
-  p->p->render((*camera)());
+  b->b->render((*camera)());
   for (auto b : monsters) {
-    b->move(ctrl, m);
     b->b->render((*camera)());
     if (dist2(p->p, b->b) < 30000) {
       stringstream ss;
@@ -173,18 +212,29 @@ void SampleLevel::render_frame() {
     }
     // else SDL_ShowCursor(SDL_DISABLE);
   }
-#ifdef __EMSCRIPTEN__
-  auto tmp = ctrl->prepareText("Q for run");
-#else
+  p->p->render((*camera)());
   auto tmp = ctrl->prepareText("Q for run, X for exit");
-#endif
   ctrl->renderText(tmp, 10, (ctrl->window.h - tmp->h) - 10);
 
   {
     stringstream ss;
-    ss<<"poznám: ";
-    for (auto b:known) ss<<b->name<<"    ";
-     if (known.size()==monsters.size()) ss<<" ... to sú už všetci!";
-    ctrl->drawText(ss.str().data(),10,10, {0,0,0}, "roboto-bold");
+    ss << "poznám: ";
+    for (auto b : known) ss << b->name << "    ";
+    if (known.size() == monsters.size()) ss << " ... to sú už všetci!";
+    ctrl->drawText(ss.str().data(), 10, 10, {0, 0, 0});
   }
+
+  m->clearCollisionLayer(0);
+  m->fillCollisionLayer(0, p->id, p->p->rect());
+  m->fillCollisionLayer(0, b->id, b->b->rect());
+  for (auto b : monsters) m->fillCollisionLayer(0, b->id, b->b->rect());
+}
+
+void SampleLevel::prepare() {
+  SDL_Rect r = *(p->p->rect());
+  r.x -= m->chunkSize();
+  r.y -= m->chunkSize();
+  r.w += 2 * m->chunkSize();
+  r.h += 2 * m->chunkSize();
+  m->makeChunksAt(&r);
 }

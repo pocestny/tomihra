@@ -1,4 +1,5 @@
 #include "levelmap.h"
+#include "connector.h"
 #include <cassert>
 #include <iostream>
 using namespace std;
@@ -28,7 +29,42 @@ LevelMap::~LevelMap() {
     if (chunks[i]) delete (chunks[i]);
 }
 
+void LevelMap::clearCollisionLayer(int l) {
+  collisionLayers[l].clear();
+  collisionLayers[l].resize(width * height, 0);
+}
+
+void LevelMap::fillCollisionLayer(int l, uint32_t v, SDL_Rect *rect) {
+  // cout<<"LevelMap::fillCollisionLayer"<<rect->x<<" "<<rect->y<<"
+  // "<<rect->w<<" "<<rect->h<<"\n";
+  for (int x = (rect->x / tile_size); x < (rect->x + rect->w) / tile_size; x++)
+    for (int y = (rect->y / tile_size); y < (rect->y + rect->h) / tile_size;
+         y++) {
+      int i = y * width + x;
+      if (i < 0 || i > collisionLayers[l].size()) continue;
+      collisionLayers[l][i] = v;
+    }
+}
+
+bool LevelMap::isCollision(int l, uint32_t v, SDL_Rect *rect) {
+  // cout<<"LevelMap::isCollision "<<rect->x<<" "<<rect->y<<" "<<rect->w<<"
+  // "<<rect->h<<"\n";
+  for (int x = (rect->x / tile_size); x < (rect->x + rect->w) / tile_size; x++)
+    for (int y = (rect->y / tile_size); y < (rect->y + rect->h) / tile_size;
+         y++) {
+      int i = y * width + x;
+      if (i < 0 || i > collisionLayers[l].size()) continue;
+      uint32_t w = collisionLayers[l][i];
+      if (w > 0 && w != v) return true;
+    }
+  return false;
+}
+
 int LevelMap::chunk_at(int px_x, int px_y) const {
+  if (px_x < 0) px_x = 0;
+  if (px_x > _screen.w) px_x = _screen.w;
+  if (px_y < 0) px_y = 0;
+  if (px_y > _screen.h) px_y = _screen.h;
   return (px_x / chunk_size) + (px_y / chunk_size) * chunk_pitch;
 }
 
@@ -90,7 +126,17 @@ void LevelMap::addTileMap(int layer, const std::string &data) {
 }
 
 void LevelMap::makeChunk(int x, int y) {
-  // cout<<"LevelMap::makeChunk("<<x<<","<<y<<")\n";
+  if (x < 0) return;
+  if (x * chunk_size >= _screen.w) return;
+  if (y < 0) return;
+  if (y * chunk_size >= _screen.h) return;
+
+  /*
+  cout << "LevelMap::makeChunk(" << x << "," << y << ") of ("
+       << _screen.w / chunk_size << "," << _screen.h / chunk_size << ")\n";
+       */
+  Connector<int>::emit(this, "LevelMap::makeChunkBegin", 0);
+
   if (chunks[x + y * chunk_pitch]) delete (chunks[x + y * chunk_pitch]);
   Chunk *c = new Chunk;
   c->px_x = x * chunk_size;
@@ -135,6 +181,15 @@ void LevelMap::makeChunk(int x, int y) {
   chunks[x + y * chunk_pitch] = c;
 }
 
+void LevelMap::makeChunksAt(SDL_Rect *r) {
+  for (int cx = (r->x / chunk_size) * chunk_size; cx < r->x + r->w;
+       cx += chunk_size)
+    for (int cy = (r->y / chunk_size) * chunk_size; cy < r->y + r->h;
+         cy += chunk_size)
+      if (!chunks[chunk_at(cx, cy)])
+        makeChunk(cx / chunk_size, cy / chunk_size);
+}
+
 void LevelMap::render(int layer, const SDL_Rect *camera) {
   // cout<<"LevelMap::render("<<layer<<",["<<camera->x<<","<<camera->y<<","<<camera->w<<","<<camera->h<<"]\n";
   for (int cx = (camera->x / chunk_size) * chunk_size;
@@ -142,7 +197,12 @@ void LevelMap::render(int layer, const SDL_Rect *camera) {
     for (int cy = (camera->y / chunk_size) * chunk_size;
          cy < camera->y + camera->h; cy += chunk_size) {
       if (!chunks[chunk_at(cx, cy)])
-        makeChunk(cx / chunk_size, cy / chunk_size);
+        for (int i = -1; i < 2; i++)
+          for (int j = -1; j < 2; j++) {
+            int x = (cx / chunk_size) + i, y = (cy / chunk_size) + j;
+            if (!chunks[x + y * chunk_pitch]) makeChunk(x, y);
+          }
+
       Chunk *c;
       assert(c = chunks[chunk_at(cx, cy)]);
       assert(c->layers.count(layer) > 0);

@@ -31,6 +31,7 @@ struct MicroUI {
   bool on;
 
   MicroUI();
+  ~MicroUI();
   void processCommands(Controller* ctrl);
 };
 
