@@ -146,7 +146,7 @@ void Brandy::move(Controller *ctrl, LevelMap *m) {
 }
 
 SampleLevel::SampleLevel(Controller *_ctrl)
-    : ctrl{_ctrl}, barrier{true}, brandyfirst{true} {
+    : ctrl{_ctrl}, barrier{true}, brandyfirst{true}, seenbarrier{false} {
   camera = new Camera(ctrl->window);
 
   // map
@@ -241,15 +241,16 @@ void SampleLevel::render() {
   if (pres == BARRIER) {
     msg(ctrl->mu_ctx(), p->p->rect(), "",
         "Zdá sa, že tu je bariéra a nedá sa prejsť");
+    seenbarrier = true;
   }
 
   if (dist2(p->p, b->b) < 30000) {
-    if (barrier || brandyfirst) {
+    if (seenbarrier && (barrier || brandyfirst)) {
       msg(ctrl->mu_ctx(), b->b->rect(), "",
           "Ja som Brandy a zrušil som ti bariéru na ostrov.");
+      barrier = false;
     } else
       msg(ctrl->mu_ctx(), b->b->rect(), "", "Ahoj, už si bol na ostrove?");
-    barrier = false;
   } else if (!barrier)
     brandyfirst = false;
 
