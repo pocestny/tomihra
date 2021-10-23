@@ -34,7 +34,7 @@ struct Brandy {
 };
 
 struct SampleLevel {
-  bool barrier,brandyfirst,seenbarrier;
+  bool barrier,brandyfirst,seenbarrier, splash;
   Controller *ctrl;
   LevelMap *m;
   Camera *camera;

@@ -146,11 +146,15 @@ void Brandy::move(Controller *ctrl, LevelMap *m) {
 }
 
 SampleLevel::SampleLevel(Controller *_ctrl)
-    : ctrl{_ctrl}, barrier{true}, brandyfirst{true}, seenbarrier{false} {
+    : ctrl{_ctrl},
+      barrier{true},
+      brandyfirst{true},
+      seenbarrier{false},
+      splash{true} {
   camera = new Camera(ctrl->window);
 
   // map
-  m = new LevelMap(ctrl->renderer, 16, 512, 512, 2048);
+  m = new LevelMap(ctrl->renderer, 16, 512, 512, 3000);
   m->addTiles(
       "t1", 16, 16,
       {0,   1,  2,  130, 132, 4,   6,   135, 8,   134, 136, 9,   131, 10,
@@ -218,6 +222,46 @@ void SampleLevel::render() {
     return;
   }
 
+  if (splash) {
+    SDL_ShowCursor(SDL_ENABLE);
+    camera->center_at(p->p->cx(), p->p->cy(), m->screen());
+    m->render(0, (*camera)());
+    b->b->render((*camera)());
+    for (auto b : monsters) b->b->render((*camera)());
+    strom->render((*camera)());
+    p->p->render((*camera)());
+    mu_Style s, *olds;
+    auto ctx = ctrl->mu_ctx();
+    olds = ctx->style;
+    s = *olds;
+    s.padding = 10;
+    s.colors[MU_COLOR_WINDOWBG] = {255, 255, 255, 150};
+    s.colors[MU_COLOR_TITLEBG] = {255, 255, 255, 200};
+    s.colors[MU_COLOR_TEXT] = {0, 0, 0, 255};
+    s.colors[MU_COLOR_TITLETEXT] = {0, 0, 0, 255};
+    s.colors[MU_COLOR_BUTTON] = {50, 90, 250, 200};
+    s.colors[MU_COLOR_BUTTONHOVER] = {50, 200, 255, 255};
+    s.colors[MU_COLOR_BUTTONFOCUS] = {50, 200, 255, 255};
+
+    ctx->style = &s;
+    if (mu_begin_window_ex(ctx, "testovací level",
+                           mu_rect(ctrl->window.w / 2 - 300, 50, 600, 200),
+                           MU_OPT_NOSCROLL | MU_OPT_NOCLOSE | MU_OPT_NORESIZE |
+                               MU_OPT_FORCEGEOM)) {
+      mu_layout_row(ctx, 1, (int[]){-1}, 0);
+      mu_text(ctx, "Spoznaj všetkých ňuňúrikov a nájdi tajomný Strom.");
+
+      mu_layout_set_next(ctx, mu_rect(270, 90, 60, 40), 1);
+      if (mu_button(ctx, "OK")) {
+        SDL_ShowCursor(SDL_DISABLE);
+        splash = false;
+      }
+      mu_end_window(ctx);
+    }
+    ctx->style = olds;
+    return;
+  }
+
   uint32_t pres = p->processInput(ctrl, camera, m);
   if ((dist2(p->p, b->b) > 30000)) b->move(ctrl, m);
   for (auto b : monsters) b->move(ctrl, m);
@@ -250,7 +294,7 @@ void SampleLevel::render() {
           "Ja som Brandy a zrušil som ti bariéru na ostrov.");
       barrier = false;
     } else
-      msg(ctrl->mu_ctx(), b->b->rect(), "", "Ahoj, už si bol na ostrove?");
+      msg(ctrl->mu_ctx(), b->b->rect(), "", "Ahoj, už si bol na ostrove na ostrove?");
   } else if (!barrier)
     brandyfirst = false;
 
@@ -274,6 +318,41 @@ void SampleLevel::render() {
   m->fillCollisionLayer(0, b->id, b->b->rect());
   m->fillCollisionLayer(0, 0xfffe, strom->rect());
   for (auto b : monsters) m->fillCollisionLayer(0, b->id, b->b->rect());
+
+  if (dist2(strom, p -> p) < 30000) {
+    if (known.size() == monsters.size()) {
+          SDL_ShowCursor(SDL_ENABLE);
+      mu_Style s, *olds;
+      auto ctx = ctrl->mu_ctx();
+      olds = ctx->style;
+      s = *olds;
+      s.padding = 10;
+      s.colors[MU_COLOR_WINDOWBG] = {255, 255, 255, 150};
+      s.colors[MU_COLOR_TITLEBG] = {255, 255, 255, 200};
+      s.colors[MU_COLOR_TEXT] = {0, 0, 0, 255};
+      s.colors[MU_COLOR_TITLETEXT] = {0, 0, 0, 255};
+      ctx->style = &s;
+      if (mu_begin_window_ex(ctx, " ",
+                             mu_rect(ctrl->window.w / 2 - 300, 50, 600, 200),
+                             MU_OPT_NOTITLE| MU_OPT_NOSCROLL | MU_OPT_NOCLOSE |
+                                 MU_OPT_NORESIZE | MU_OPT_FORCEGEOM)) {
+        mu_layout_row(ctx, 1, (int[]){-1}, 0);
+        mu_text(ctx, "Gratulujem, vyhral si :-) ");
+
+        mu_layout_set_next(ctx, mu_rect(280, 90, 60, 40), 1);
+        if (mu_button(ctx, "OK")) {
+          SDL_ShowCursor(SDL_DISABLE);
+          Connector<int>::emit(this, "finished", 0);
+        }
+        mu_end_window(ctx);
+      }
+      ctx->style = olds;
+      return;
+    } else {
+      msg(ctrl->mu_ctx(), p->p->rect(), "",
+          "Ešte treba spoznať všetkých ňuňúrikov.");
+    }
+  }
 }
 
 void SampleLevel::prepare() {
