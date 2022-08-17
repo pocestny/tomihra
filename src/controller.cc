@@ -1,24 +1,9 @@
 #include "controller.h"
+#include "verbose.h"
 
 using namespace std;
 
-void Camera::center_at(int x, int y, const SDL_Rect* screen) {
-  // cout<<"Camera::center_at("<<x<<","<<y<<",["<<screen->x<<","<<screen->y<<","<<screen->w<<","<<screen->h<<"])\n";
-  rect.x = x - rect.w / 2;
-  if (rect.x < screen->x) rect.x = screen->x;
-  if (rect.x + rect.w > screen->x + screen->w)
-    rect.x = screen->x + screen->w - rect.w;
-  rect.y = y - rect.h / 2;
-  if (rect.y < screen->y) rect.y = screen->y;
-  if (rect.y + rect.h > screen->y + screen->h)
-    rect.y = screen->y + screen->h - rect.h;
-}
-void Camera::print() {
-  cout << "Camera [" << rect.x << "," << rect.y << "," << rect.w << ","
-       << rect.h << "]\n";
-}
-
-MicroUI::MicroUI() : on{false} {
+MicroUI::MicroUI() : on{true} {
   button_map.fill(0);
   button_map[SDL_BUTTON_LEFT & 0xff] = MU_MOUSE_LEFT;
   button_map[SDL_BUTTON_RIGHT & 0xff] = MU_MOUSE_RIGHT;
@@ -33,14 +18,12 @@ MicroUI::MicroUI() : on{false} {
   key_map[SDLK_RALT & 0xff] = MU_KEY_ALT;
   key_map[SDLK_RETURN & 0xff] = MU_KEY_RETURN;
   key_map[SDLK_BACKSPACE & 0xff] = MU_KEY_BACKSPACE;
-  
+
   mu_ctx = new (mu_Context);
   mu_init(mu_ctx);
 }
 
-MicroUI::~MicroUI() {
-  delete mu_ctx;
-}
+MicroUI::~MicroUI() { delete mu_ctx; }
 
 void MicroUI::processCommands(Controller* ctrl) {
   mu_Command* cmd = NULL;
@@ -75,14 +58,14 @@ void MicroUI::processCommands(Controller* ctrl) {
 }
 
 Controller::Controller(const string& window_name, int width, int height)
-    : window{.x = 0, .y = 0, .w = width, .h = height}, bg{0, 0, 0, 0xff} {
+    : bg{0, 0, 0, 0xff}, quit{false} {
   key_pressed.resize(listened_keys.size(), false);
   key_pressed_old.resize(listened_keys.size(), false);
   assert(SDL_Init(SDL_INIT_VIDEO) >= 0);
   assert(SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "1"));
   assert(sdl_window = SDL_CreateWindow(
              window_name.data(), SDL_WINDOWPOS_UNDEFINED,
-             SDL_WINDOWPOS_UNDEFINED, window.w, window.h, SDL_WINDOW_SHOWN));
+             SDL_WINDOWPOS_UNDEFINED, width, height, SDL_WINDOW_SHOWN));
   assert(renderer =
              SDL_CreateRenderer(sdl_window, -1, SDL_RENDERER_ACCELERATED));
   assert(IMG_Init(IMG_INIT_PNG) == IMG_INIT_PNG);
@@ -93,7 +76,6 @@ Controller::Controller(const string& window_name, int width, int height)
   loadFont("roboto-bold", Fonts::roboto_bold(), 17);
   loadFont("large", Fonts::roboto_bold(), 25);
   defaultFont = "roboto-regular";
-
 }
 
 void Controller::loadFont(std::string name, std::string data, int size) {
@@ -137,6 +119,16 @@ int Controller::textHeight(std::string font) {
   int w, h;
   TTF_SizeText(fonts[font], "SampleText", &w, &h);
   return h;
+}
+
+SDL_Texture* Controller::loadImage(const std::string& data) {
+  SDL_RWops* rw;
+  SDL_Surface* srf;
+  assert(rw = SDL_RWFromConstMem((const void*)data.data(), data.size()));
+  assert(srf = IMG_Load_RW(rw, 1));
+  SDL_Texture* img = SDL_CreateTextureFromSurface(renderer, srf);
+  SDL_FreeSurface(srf);
+  return img;
 }
 
 uint32_t Controller::iteration() {
@@ -206,11 +198,17 @@ uint32_t Controller::iteration() {
 }
 
 void Controller::run() {
-  bool quit = false;
   while (!quit) {
     uint32_t time = iteration();
     if (time < ticks_per_frame) SDL_Delay(ticks_per_frame - time);
   }
+}
+
+SDL_Rect *Controller::screen() {
+  int w, h;
+  SDL_GetWindowSize(sdl_window, &w, &h);
+  _screen = SDL_Rect{.x = 0, .y = 0, .w = w, .h = h};
+  return &_screen;
 }
 
 Controller::~Controller() {

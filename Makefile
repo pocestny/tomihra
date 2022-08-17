@@ -1,10 +1,13 @@
 BINARY     := hra
-SOURCES    := controller.cc levelmap.cc main.cc sprite.cc resources.cc\
-							microui.cc sample_level.cc
-HEADERS    := base64.h connector.h controller.h hash.h levelmap.h sprite.h\
-							resources.h microui.h sample_level.h 
+SOURCES    := camera.cc controller.cc  main.cc resources.cc\
+							microui.cc script.cc terrainmap.cc sprite.cc\
+							ulpccharacter.cc demolevel.cc collisionlayer.cc
+HEADERS    := base64.h connector.h camera.h controller.h hash.h \
+							resources.h microui.h script.h terrainmap.h sprite.h\
+							ulpccharacter.h verbose.h demolevel.h demolevel.inc \
+							collisionlayer.h
 OUTDIR     ?= build
-RESOURCES  := tilemap.png tilesheet.png player_sheet.png splash.png
+RESOURCES  := 
 
 srcdir    ?= src
 resdir    ?= resources
@@ -21,12 +24,13 @@ resource_compiler_dir := resource_compiler
 resource_conf         := $(resdir)/resources.conf
 
 CXX        := clang++
-CXXFLAGS   := -O3 -g -std=c++20 -I $(srcdir)
+DEBUGFLAGS := -D VERBOSE -D RENDER_RECT -D DRAW_UNPASSABLE
+CXXFLAGS   := -g -std=c++20 -I $(srcdir) -O3 -D VERBOSE #${DEBUGFLAGS}
 LDFLAGS    := -lSDL2 -lSDL2_image -lSDL2_ttf -lm
 EMCC       := emcc
 EMCCFLAGS  := -O3 -g -s ALLOW_MEMORY_GROWTH=1 -s USE_SDL=2 -s USE_SDL_IMAGE=2\
 							-s SDL2_IMAGE_FORMATS='["png"]' -s USE_SDL_TTF=2\
-							-I $(srcdir) -g -std=c++20 -lm
+							-I $(srcdir) -g -std=c++20 -lm #-D VERBOSE
 
 
 all: $(resource_compiler) $(outbin)
@@ -54,14 +58,14 @@ web: $(sources) $(headers)
 	mkdir -p $(webdir)
 	$(EMCC) $(EMCCFLAGS) $(sources) -o $(webdir)/hra.html
 	cp $(srcdir)/hra.html $(webdir)
+	cp $(resdir)/all-credits.csv $(webdir)
 
 #  cleanup
 
 clean:
 	$(RM) -r $(outdir)
+	$(RM) -r $(webdir)
 
-clean-all:
-	$(RM) -r $(out)
 
-.PHONY: all clean clean-all 
+.PHONY: all clean 
 

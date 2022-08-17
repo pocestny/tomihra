@@ -23,13 +23,17 @@
  * int main() {
  *    A a;
  *
- *    Connector<int>::connect(&a, "kicking", [](int x) { cout << "A kicked " <<
- * x << endl; }); a.kick(4); Connector<int>::disconnect_all(&a, "kicking");
+ *    Connector<int>::connect(&a, "kicking", [](int x) { 
+ *      cout << "A kicked " << x << endl; }); 
+ *    a.kick(4); 
+ *    Connector<int>::disconnect_all(&a, "kicking");
  *    a.kick(5);
  *    int id = Connector<int>::connect(&a, "kicking", [](int x) {
  *        cout << "A reconnected kicked " << x << endl; });
- *    Connector<int>::connect(&a, "kicking", [](int x) { cout << "B kicked " <<
- * x << endl; }); a.kick(6); Connector<int>::disconnect(&a, "kicking", id);
+ *    Connector<int>::connect(&a, "kicking", [](int x) { 
+ *        cout << "B kicked " << x << endl; }); 
+ *    a.kick(6); 
+ *    Connector<int>::disconnect(&a, "kicking", id);
  *    a.kick(7);
  * }
  *
@@ -46,7 +50,7 @@ class Connector {
   using MapAll =
       std::unordered_map<std::string, std::vector<std::pair<Slot, int>>>;
 
-  // connect a slot to a signa from a sender
+  // connect a slot to a signal from a sender
   // return connection id
   template <typename T>
   static int connect(T* sender, std::string signal, Slot recv);

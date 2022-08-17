@@ -1,43 +1,50 @@
 #ifndef __SPRITE_H__
 #define __SPRITE_H__
 
+/*
+ * basic sprite with animations
+ * has bounding (rect) and collision rectangle
+ * has a number of character sheets
+ * has a number of animations: each is a sequence of frames and endtimes
+ * one animation is always running
+ * calling render advances current animation, if it ends, emits
+ * "animatione_ended" signal
+ */
+
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_image.h>
+
 #include <cassert>
 #include <string>
 #include <unordered_map>
 #include <vector>
 
-class Sprite {
- public:
+struct Sprite {
   struct Frame {
     std::string charsheet;
     int x, y;
     uint32_t end_time;
   };
 
- protected:
+  uint32_t id;
   SDL_Renderer* renderer;
-  SDL_Rect _rect, _collision_rect;
+  SDL_Rect rect, collision_rect;
   std::unordered_map<std::string, SDL_Texture*> charsheets;
   std::unordered_map<std::string, std::vector<Frame>> animations;
   std::string current_animation;
-  uint32_t current_animation_start;
+  uint32_t current_animation_start;  // time when animation started
+  int cxo, cyo;                      // offset to center
 
- public:
-  Sprite(SDL_Renderer* _renderer, int w, int h);
+  Sprite(uint32_t _id, SDL_Renderer* _renderer, int w, int h);
   ~Sprite();
 
-  const std::string& animation_running() const { return current_animation; }
-  SDL_Rect* const rect()  { return &_rect; }
-  SDL_Rect* const collision_rect()  { return &_collision_rect; }
-  int cx() const { return _rect.x + _rect.h / 2; }
-  int cy() const { return _rect.y + _rect.w / 2; }
+  int cx() const { return rect.x + cxo; }
+  int cy() const { return rect.y + cyo; }
   void moveTo(int x, int y) {
-    _collision_rect.x += x  - _rect.x;
-    _rect.x = x;
-    _collision_rect.y += y - _rect.y;
-    _rect.y = y;
+    collision_rect.x += x - rect.x;
+    rect.x = x;
+    collision_rect.y += y - rect.y;
+    rect.y = y;
   }
   void addCharsheet(std::string name, const std::string& data);
   void addAnimation(std::string name, const std::vector<Frame>& anim);

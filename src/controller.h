@@ -1,11 +1,43 @@
 #ifndef __CONTROLLER_H__
 #define __CONTROLLER_H__
-#include "connector.h"
-#include "microui.h"
-#include "resources.h"
+
+/*
+ * takes care of low-level stuff
+ *
+ * data:
+ *    MicroUI instance
+ *        Controller::mu_ctx() gives context
+ *        can be excluded from iteration (Controller::microUI::on)
+ *
+ * constructor:
+ *    initialize and open window,
+ *    prepare fonts (from resources),
+ *    prepare microui instance
+ *
+ * iteration:
+ *   process events. for each event update key status, dispatch to microUI, emit
+ * "event" emit "frame" render frame return elapsed time
+ *
+ * run:
+ *  repeat iteration throttled to maxFPS until quit is set
+ *
+ * helpers:
+ *  int           textHeight(string font)
+ *  int           textWidth(string font, const char* text)
+ *  void          renderText(SDL_Surface* textSurface, int x, int y)
+ *  SDL_Surface*  prepareText(const char* text, SDL_Color color, string font)
+ *  void          drawText(const char* text, int x, int y, SDL_Color color,
+ * string font) SDL_Texture*  loadImage(string data)
+ *
+ * TODO:
+ *  process resize events
+ *  render icons in microui
+ */
+
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_image.h>
 #include <SDL2/SDL_ttf.h>
+
 #include <array>
 #include <cassert>
 #include <iostream>
@@ -13,16 +45,9 @@
 #include <unordered_map>
 #include <vector>
 
-class Camera {
- protected:
-  SDL_Rect rect;
-
- public:
-  Camera(SDL_Rect _rect) : rect{_rect} {}
-  const SDL_Rect* operator()() const { return &rect; }
-  void center_at(int x, int y, const SDL_Rect* screen);
-  void print();
-};
+#include "connector.h"
+#include "microui.h"
+#include "resources.h"
 
 struct Controller;
 struct MicroUI {
@@ -38,9 +63,12 @@ struct MicroUI {
 struct Controller {
   const int maxFPS = 60;
   const int ticks_per_frame = (1000 / maxFPS);
+
+  // keep track of the pressed state of these keys
   const std::vector<SDL_Keycode> listened_keys{
-      SDLK_x,    SDLK_q,     SDLK_UP,     SDLK_DOWN,
-      SDLK_LEFT, SDLK_RIGHT, SDLK_LSHIFT, SDLK_RSHIFT};
+      SDLK_x,     SDLK_q,      SDLK_UP,     SDLK_DOWN,  SDLK_LEFT,
+      SDLK_RIGHT, SDLK_LSHIFT, SDLK_RSHIFT, SDLK_LCTRL, SDLK_RCTRL, SDLK_SPACE, SDLK_a,
+      SDLK_s,     SDLK_d,      SDLK_w,};
   enum {
     KEY_x = 0,
     KEY_q,
@@ -49,15 +77,23 @@ struct Controller {
     KEY_LEFT,
     KEY_RIGHT,
     KEY_LSHIFT,
-    KEY_RSHIFT
+    KEY_RSHIFT,
+    KEY_LCTRL,
+    KEY_RCTRL,
+    KEY_SPACE,
+    KEY_a,
+    KEY_s,
+    KEY_d,
+    KEY_w
   };
-  std::vector<bool> key_pressed, key_pressed_old;
+  std::vector<bool> key_pressed,  // is the key pressed now?
+      key_pressed_old;            // was it pressed in previous iteration?
   std::string defaultFont;
 
   SDL_Window* sdl_window;
   SDL_Renderer* renderer;
-  SDL_Rect window;
   SDL_Color bg;
+  SDL_Rect _screen; // static fuffer for the screen() method
 
   MicroUI microUi;
 
@@ -77,9 +113,16 @@ struct Controller {
   }
   int textWidth(std::string font, const char* text);
   int textHeight(std::string font);
+  SDL_Texture* loadImage(const std::string&);
+  SDL_Rect *screen();
   uint32_t iteration();
+  bool quit;
   void run();
   ~Controller();
 };
+
+extern Controller *controller;
+#define KEY(x) (controller->key_pressed[Controller::KEY_##x])
+#define PREV_KEY(x) (controller->key_pressed_old[Controller::KEY_##x])
 
 #endif
