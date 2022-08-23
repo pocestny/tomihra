@@ -50,6 +50,7 @@ struct Sprite {
   void addAnimation(std::string name, const std::vector<Frame>& anim);
   void startAnimation(std::string name);
   void render(const SDL_Rect* camera);
+
 };
 
 #endif

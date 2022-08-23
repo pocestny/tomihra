@@ -7,10 +7,15 @@
  * - map consists of tiles. each tile has ID and comes from some tilesheet
  * - all tiles have the same dimension (tile_size x tile_size) px
  * - map has dimensions (width x height) tiles
- * - map has several render layers
- *    render layer has id and tilemap
- *    tilemap is SDL_Surface*  (width x height) where rgba8 pixel stores tileID
- * - rendered map is divided into chunks of (chunk_size x chunk_size) px
+ * - map has several stages that are rendered separately (e.g. first render
+ * background, then players, sprites, etc. are rendered, then render second
+ * stage of map, etc)
+ * - each stage is a group of of render layers
+ * - render layer can be switched on/off for visibility and/or accesibility
+ * - render layer has a SDL_Surface*  (width x height) where rgba8
+ *      pixel stores tileID 
+ * - the surface may be combined from several input ones (multiple calls of addSurfaceToLayer)     
+ * - final rendered map is divided into chunks of (chunk_size x chunk_size) px
  * - chunk owns a rendered SDL_Texture* for each render layer
  */
 
@@ -24,17 +29,15 @@
 #include <unordered_set>
 #include <vector>
 
+/*
+ * sheet with tile images
+ */
 struct TileSheet {
   SDL_Surface *sheet;
   int pitch,    // number of tiles in a row
       strideX,  // stride in the grid
       strideY;
 };
-  
-struct TileMap{
-    SDL_Surface *surface;
-    float opacity;
-  };
 
 
 /*
@@ -43,10 +46,22 @@ struct TileMap{
  * (passable etc)
  */
 struct Tile {
+  static const uint32_t Empty = 0x0;
   uint32_t id;
   TileSheet *tilesheet;
   int x, y;  // absolute position in tilesheet
   bool passable;
+};
+
+/*
+ * description of a render layer
+ * created from a number of images where the rgba8 pixel value is tileID, each with a given
+ * float opacity they are meant to be rendered together
+ */
+struct RenderLayer {
+  SDL_Surface * surface;
+  float opacity;
+  bool visible, collision_active;
 };
 
 /*
@@ -55,6 +70,8 @@ struct Tile {
 
 struct TerrainMap {
   // chunk starting at pixel position (px_x, px_y) px with all render layers
+  // prerendered
+  // TODO optimize: don't blit empty layers
   struct Chunk {
     std::unordered_map<int, SDL_Texture *> layers;
     int px_x, px_y;
@@ -96,14 +113,13 @@ struct TerrainMap {
    */
 
   SDL_Renderer *renderer;  // not owned, stored for convenience from controller
-
   int tile_size, width, height;  // dimensions in number of tiles
 
-  std::unordered_map<int, TileMap *> tilemaps;  // render layer ->  tilemap
-  std::unordered_set<int> visible_layers,
-      collision_active_layers;  // switch which layers are active
-  std::vector<uint32_t> layers;  // order of render layers (from bottom)
-  
+  std::vector<RenderLayer> layers;
+  std::unordered_map<std::string, int> layerIDs;
+  // lists render layesr in each stage
+  std::vector<std::vector<int>> stages;
+
   std::unordered_map<std::string, TileSheet *> tilesheets;
   std::unordered_map<uint32_t, Tile> tiles;  // id->tile
 
@@ -127,7 +143,14 @@ struct TerrainMap {
   inline int px_height() const { return tile_size * height; }
 
   // tiles
-  void addTileMap(int layer, const std::string &data,float opacity=1.0);
+  // insert new layer at the end of layers
+  void addRenderLayer(const std::string &name, float opacity=1.0);
+  // add a new surface to a layer
+  void addSurfaceToLayer(const std::string &layer, const std::string &data);
+
+  // create a new stage with given layers
+  void addStage(const std::vector<std::string> &lnames);
+
   void addTileSheet(std::string name, const std::string &data, int pitch,
                     int strideX, int strideY);
 
@@ -137,11 +160,11 @@ struct TerrainMap {
       const std::vector<uint32_t> &t,  // indices of tiles in the sheet
       const std::unordered_set<uint32_t> solid = {});  // which not passable
 
-  // color at given position in tilemap (tile coordinates)
-  uint32_t clr_at(int layer, int tx, int ty) const;
-  const Tile &tile_at(int layer, int px_x, int px_y) const;
+  uint32_t tile_at(int layer, int px_x, int px_y) const;
 
-  bool accessible(SDL_Rect *rect);  // are all tiles accessible?
+  // test if all tiles from the rest are accesible in all collision_active
+  // layers of given stages
+  bool accessible(const std::vector<int> &inStages, SDL_Rect *rect);
 
   // chunks
   const int chunkSize() const { return chunk_size; }
@@ -150,7 +173,8 @@ struct TerrainMap {
   void makeChunk(int x, int y);         // in chunk coordinates
   bool processChunkJobs();              //  return true if more work is needed
 
-  void render(int layer, const SDL_Rect *camera);  // render the window
+  // render given stage to window
+  void render(int stage, const SDL_Rect *camera);  
 };
 
 #endif

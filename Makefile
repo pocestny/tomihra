@@ -1,11 +1,13 @@
+
 BINARY     := hra
-SOURCES    := camera.cc controller.cc  main.cc resources.cc\
+SOURCES    := pixel.cc camera.cc controller.cc  main.cc resources.cc\
 							microui.cc script.cc terrainmap.cc sprite.cc\
-							ulpccharacter.cc demolevel.cc collisionlayer.cc
+							ulpccharacter.cc demolevel.cc collisionlayer.cc \
+							items.cc inventory.cc verbose.cc
 HEADERS    := base64.h connector.h camera.h controller.h hash.h \
 							resources.h microui.h script.h terrainmap.h sprite.h\
 							ulpccharacter.h verbose.h demolevel.h demolevel.inc \
-							collisionlayer.h
+							collisionlayer.h pixel.h items.h inventory.h
 OUTDIR     ?= build
 RESOURCES  := 
 
@@ -25,7 +27,7 @@ resource_conf         := $(resdir)/resources.conf
 
 CXX        := clang++
 DEBUGFLAGS := -D VERBOSE -D RENDER_RECT -D DRAW_UNPASSABLE
-CXXFLAGS   := -g -std=c++20 -I $(srcdir) -O3 -D VERBOSE #${DEBUGFLAGS}
+CXXFLAGS   := -std=c++20 -I $(srcdir) 
 LDFLAGS    := -lSDL2 -lSDL2_image -lSDL2_ttf -lm
 EMCC       := emcc
 EMCCFLAGS  := -O3 -g -s ALLOW_MEMORY_GROWTH=1 -s USE_SDL=2 -s USE_SDL_IMAGE=2\
@@ -33,7 +35,15 @@ EMCCFLAGS  := -O3 -g -s ALLOW_MEMORY_GROWTH=1 -s USE_SDL=2 -s USE_SDL_IMAGE=2\
 							-I $(srcdir) -g -std=c++20 -lm #-D VERBOSE
 
 
-all: $(resource_compiler) $(outbin)
+
+all: $(resource_compiler) release
+
+debug:  CXXFLAGS += -D VERBOSE -g -D RENDER_RECT
+debug:  $(outbin)
+
+release: CXXFLAGS += -O3
+release:  $(outbin)
+
 
 $(resource_compiler):
 	mkdir -p $(outdir)

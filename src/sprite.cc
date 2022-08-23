@@ -67,6 +67,7 @@ void Sprite::render(const SDL_Rect* camera) {
 
 #ifdef RENDER_RECT  
   {
+    SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
     SDL_RenderDrawRect(renderer, &dst);
     SDL_IntersectRect(&collision_rect, camera, &dst);
     SDL_SetRenderDrawColor(renderer, 0, 0, 255, 255);
@@ -76,3 +77,5 @@ void Sprite::render(const SDL_Rect* camera) {
   }
 #endif  
 }
+
+

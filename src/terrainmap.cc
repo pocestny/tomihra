@@ -4,6 +4,8 @@
 #include <iostream>
 
 #include "connector.h"
+#include "pixel.h"
+
 using namespace std;
 
 TerrainMap::ChunkIterator::ChunkIterator(const SDL_Rect *r, TerrainMap *self) {
@@ -43,10 +45,9 @@ TerrainMap::TerrainMap(SDL_Renderer *_renderer, int _tile_size, int _width,
 }
 
 TerrainMap::~TerrainMap() {
-  for (auto x : tilemaps) {
-    assert(x.second->surface);
-    SDL_FreeSurface(x.second->surface);
-    delete x.second;
+  for (auto &l : layers) {
+    assert(l.surface);
+    SDL_FreeSurface(l.surface);
   }
   for (int i = 0; i < chunks.size(); i++)
     if (chunks[i]) delete (chunks[i]);
@@ -57,22 +58,33 @@ TerrainMap::~TerrainMap() {
   }
 }
 
-void TerrainMap::addTileMap(int layer, const std::string &data, float opacity) {
-  SDL_RWops *tmp;
-  SDL_Surface *srf;
-  assert(tmp = SDL_RWFromConstMem((const void *)data.data(), data.size()));
-  assert(srf = IMG_Load_RW(tmp, 1));
-  assert(srf->h == height);
-  assert(srf->w == width);
-  assert(srf->pitch >= 4 * width);
+void TerrainMap::addRenderLayer(const string &name, float opacity) {
+  layerIDs[name] = layers.size();
+  layers.push_back(RenderLayer{nullptr, opacity, true, true});
+}
 
-  if (tilemaps.count(layer) > 0) {
-    SDL_FreeSurface(tilemaps[layer]->surface);
-    delete tilemaps[layer];
-  }
-  tilemaps[layer] = new TileMap{srf,opacity};
-  visible_layers.insert(layer);
-  collision_active_layers.insert(layer);
+void TerrainMap::addSurfaceToLayer(const string &layer, const string &data) {
+  SDL_RWops *tmp;
+  SDL_Surface *src, *dst = layers[layerIDs[layer]].surface;
+  assert(tmp = SDL_RWFromConstMem((const void *)data.data(), data.size()));
+  assert(src = IMG_Load_RW(tmp, 1));
+  assert(src->h == height);
+  assert(src->w == width);
+  assert(src->pitch >= 4 * width);
+
+  if (dst == nullptr)
+    layers[layerIDs[layer]].surface = src;
+  else
+    for (int x = 0; x < width; x++)
+      for (int y = 0; y < height; y++) {
+        uint32_t val = pixelAt(src, x, y);
+        if (val != 0) setPixelAt(dst, x, y, val);
+      }
+}
+
+void TerrainMap::addStage(const vector<string> &lnames) {
+  stages.push_back(vector<int>());
+  for (auto &n : lnames) stages.back().push_back(layerIDs[n]);
 }
 
 void TerrainMap::addTileSheet(std::string name, const std::string &data,
@@ -85,31 +97,23 @@ void TerrainMap::addTileSheet(std::string name, const std::string &data,
   tilesheets[name] = new TileSheet{surface, pitch, strideX, strideY};
 }
 
-void TerrainMap::addTiles(string sheetname, const vector<uint32_t>&ids,  const vector<uint32_t> &t,
+void TerrainMap::addTiles(string sheetname, const vector<uint32_t> &ids,
+                          const vector<uint32_t> &t,
                           const unordered_set<uint32_t> solid) {
   TileSheet *sheet = tilesheets.at(sheetname);
-  for (int i=0;i<ids.size();i++)
-    tiles[ids[i]] =
-        Tile{ids[i],sheet, sheet->strideX * ((int)t[i] % sheet->pitch),
-             sheet->strideY * ((int)t[i] / sheet->pitch), (solid.count(t[i]) == 0)};
+  for (int i = 0; i < ids.size(); i++)
+    tiles[ids[i]] = Tile{
+        ids[i], sheet, sheet->strideX * ((int)t[i] % sheet->pitch),
+        sheet->strideY * ((int)t[i] / sheet->pitch), (solid.count(t[i]) == 0)};
 }
 
-uint32_t TerrainMap::clr_at(int layer, int tx, int ty) const {
-  int offs = ty * tilemaps.at(layer)->surface->pitch + 4 * tx;
-  uint32_t res = 0;
-  for (int i = 0; i < 4; i++)
-    res = (res << 8) | ((uint8_t *)(tilemaps.at(layer)->surface->pixels))[offs + i];
-  return res;
-}
-
-const Tile &TerrainMap::tile_at(int layer, int px_x, int px_y) const {
-  assert(tilemaps.count(layer) > 0);
+uint32_t TerrainMap::tile_at(int layer, int px_x, int px_y) const{
+  uint32_t res = Tile::Empty;
   int tx = px_x / tile_size, ty = px_y / tile_size;
-  uint32_t clr = clr_at(layer, tx, ty);
-  return tiles.at(clr);
+  return pixelAt(layers[layer].surface, tx, ty);
 }
 
-bool TerrainMap::accessible(SDL_Rect *rect) {
+bool TerrainMap::accessible(const vector<int> &inStages, SDL_Rect *rect) {
   if (rect->x + rect->w > screen.w) return false;
   if (rect->y + rect->h > screen.h) return false;
   if (rect->x < 0) return false;
@@ -118,8 +122,10 @@ bool TerrainMap::accessible(SDL_Rect *rect) {
        x += tile_size)
     for (int y = (rect->y / tile_size) * tile_size; y < rect->y + rect->h;
          y += tile_size)
-      for (auto l : tilemaps)
-        if(collision_active_layers.count(l.first) && !tile_at(l.first, x, y).passable) return false;
+      for (auto s : inStages)
+        for (auto l : stages[s])
+          if (layers[l].collision_active && !tiles[tile_at(l, x, y)].passable)
+            return false;
   return true;
 }
 
@@ -155,15 +161,14 @@ bool TerrainMap::processChunkJobs() {
                     .y = rect.y - cj.c->px_y,
                     .w = rect.w,
                     .h = rect.h};
-    const Tile &t = tile_at(cj.layers.back(), cj.tx, cj.ty);
+    Tile &t = tiles[tile_at(cj.layers.back(), cj.tx, cj.ty)];
     src.x += t.x;
     src.y += t.y;
 
-    assert(SDL_BlitSurface(t.tilesheet->sheet, &src, cj.srf, &dst) ==
-           0);
+    assert(SDL_BlitSurface(t.tilesheet->sheet, &src, cj.srf, &dst) == 0);
 #ifdef DRAW_UNPASSABLE
-    if (collision_active_layers.count(cj.layers.back())&&!t.passable) {
-      SDL_FillRect(cj.srf,&dst,SDL_MapRGBA(cj.srf->format,255,0,0,50));
+    if (layers[cj.layers.back()].collision_active && !t.passable) {
+      SDL_FillRect(cj.srf, &dst, SDL_MapRGBA(cj.srf->format, 255, 0, 0, 50));
     }
 #endif
 
@@ -177,7 +182,7 @@ bool TerrainMap::processChunkJobs() {
     // surface finished
     int layer = cj.layers.back();
     cj.c->layers[layer] = SDL_CreateTextureFromSurface(renderer, cj.srf);
-    SDL_SetTextureAlphaMod(cj.c->layers[layer], 255*tilemaps[layer]->opacity);
+    SDL_SetTextureAlphaMod(cj.c->layers[layer], 255 * layers[layer].opacity);
 
     if (cj.c->layers[layer] == nullptr) {
       cout << "CreateTextureFromSurface failed: " << SDL_GetError() << endl;
@@ -206,7 +211,7 @@ void TerrainMap::makeChunk(int x, int y) {
   cj.c = new Chunk;
   cj.c->px_x = x * chunk_size;
   cj.c->px_y = y * chunk_size;
-  for (auto t : tilemaps) cj.layers.push_back(t.first);
+  for (int i = 0; i < layers.size(); i++) cj.layers.push_back(i);
   cj.x = x;
   cj.y = y;
   cj.srf = nullptr;
@@ -226,29 +231,29 @@ void TerrainMap::makeChunksAt(const SDL_Rect *r) {
   for (auto it = ChunkIterator(r, this); it; ++it) makeChunk(it.x, it.y);
 }
 
-void TerrainMap::render(int layer, const SDL_Rect *camera) {
+void TerrainMap::render(int stage, const SDL_Rect *camera) {
   makeChunksAt(camera);
   if (chunkjobs.size() > 0) return;
-  for (auto it = ChunkIterator(camera, this); it; ++it) {
-    Chunk *c;
-    assert(c = chunks[chunk_at(it.cx, it.cy)]);
-    assert(c->layers.count(layer) > 0);
-    SDL_Rect chunk_r = {.x = it.cx,
-                        .y = it.cy,
-                        .w = chunk_size,
-                        .h = chunk_size},
-             rect;
-    assert(SDL_IntersectRect(&chunk_r, camera, &rect) == SDL_TRUE);
-    SDL_Rect src = {.x = rect.x - it.cx,
-                    .y = rect.y - it.cy,
-                    .w = rect.w,
-                    .h = rect.h},
-             dst = {.x = rect.x - camera->x,
-                    .y = rect.y - camera->y,
-                    .w = rect.w,
-                    .h = rect.h};
-    SDL_RenderCopy(renderer, c->layers[layer], &src, &dst);
-  }
+  for (int layer : stages[stage])
+    if (layers[layer].visible)
+      for (auto it = ChunkIterator(camera, this); it; ++it) {
+        Chunk *c;
+        assert(c = chunks[chunk_at(it.cx, it.cy)]);
+        assert(c->layers.count(layer) > 0);
+        SDL_Rect chunk_r = {.x = it.cx,
+                            .y = it.cy,
+                            .w = chunk_size,
+                            .h = chunk_size},
+                 rect;
+        assert(SDL_IntersectRect(&chunk_r, camera, &rect) == SDL_TRUE);
+        SDL_Rect src = {.x = rect.x - it.cx,
+                        .y = rect.y - it.cy,
+                        .w = rect.w,
+                        .h = rect.h},
+                 dst = {.x = rect.x - camera->x,
+                        .y = rect.y - camera->y,
+                        .w = rect.w,
+                        .h = rect.h};
+        SDL_RenderCopy(renderer, c->layers[layer], &src, &dst);
+      }
 }
-
-

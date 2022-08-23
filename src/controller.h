@@ -66,12 +66,18 @@ struct Controller {
 
   // keep track of the pressed state of these keys
   const std::vector<SDL_Keycode> listened_keys{
-      SDLK_x,     SDLK_q,      SDLK_UP,     SDLK_DOWN,  SDLK_LEFT,
-      SDLK_RIGHT, SDLK_LSHIFT, SDLK_RSHIFT, SDLK_LCTRL, SDLK_RCTRL, SDLK_SPACE, SDLK_a,
-      SDLK_s,     SDLK_d,      SDLK_w,};
+      SDLK_SPACE,  SDLK_a,      SDLK_d,     SDLK_i,     SDLK_q,     SDLK_s,
+      SDLK_w,      SDLK_x,      SDLK_UP,    SDLK_DOWN,  SDLK_LEFT,  SDLK_RIGHT,
+      SDLK_LSHIFT, SDLK_RSHIFT, SDLK_LCTRL, SDLK_RCTRL, SDLK_ESCAPE};
   enum {
-    KEY_x = 0,
+    KEY_SPACE = 0,
+    KEY_a,
+    KEY_d,
+    KEY_i,
     KEY_q,
+    KEY_s,
+    KEY_w,
+    KEY_x,
     KEY_UP,
     KEY_DOWN,
     KEY_LEFT,
@@ -80,20 +86,20 @@ struct Controller {
     KEY_RSHIFT,
     KEY_LCTRL,
     KEY_RCTRL,
-    KEY_SPACE,
-    KEY_a,
-    KEY_s,
-    KEY_d,
-    KEY_w
+    KEY_ESCAPE,
   };
   std::vector<bool> key_pressed,  // is the key pressed now?
       key_pressed_old;            // was it pressed in previous iteration?
   std::string defaultFont;
 
+  int32_t mouseX, mouseY;
+  bool mouseButton[3],  // left, middle, right
+      isMouseUp, isMouseDown;
+
   SDL_Window* sdl_window;
   SDL_Renderer* renderer;
   SDL_Color bg;
-  SDL_Rect _screen; // static fuffer for the screen() method
+  SDL_Rect _screen;  // static fuffer for the screen() method
 
   MicroUI microUi;
 
@@ -114,14 +120,33 @@ struct Controller {
   int textWidth(std::string font, const char* text);
   int textHeight(std::string font);
   SDL_Texture* loadImage(const std::string&);
-  SDL_Rect *screen();
+  SDL_Surface* loadImageSurface(const std::string&);
+  SDL_Rect* screen();
   uint32_t iteration();
   bool quit;
   void run();
+  inline bool isLeftClick() {
+    return isMouseDown && mouseButton[0] && !mouseButton[1] && !mouseButton[2];
+  }
+  inline bool isMiddleClick() {
+    return isMouseDown && !mouseButton[0] && mouseButton[1] && !mouseButton[2];
+  }
+  inline bool isRightClick() {
+    return isMouseDown && !mouseButton[0] && !mouseButton[1] && mouseButton[2];
+  }
+  inline bool isLeftRelease() {
+    return isMouseUp && !mouseButton[0] ;
+  }
+  inline bool isMiddleRelease() {
+    return isMouseUp && !mouseButton[1] ;
+  }
+  inline bool isRightRelease() {
+    return isMouseUp && !mouseButton[2];
+  }
   ~Controller();
 };
 
-extern Controller *controller;
+extern Controller* controller;
 #define KEY(x) (controller->key_pressed[Controller::KEY_##x])
 #define PREV_KEY(x) (controller->key_pressed_old[Controller::KEY_##x])
 

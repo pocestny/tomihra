@@ -1,4 +1,5 @@
 #include "controller.h"
+
 #include "verbose.h"
 
 using namespace std;
@@ -58,7 +59,11 @@ void MicroUI::processCommands(Controller* ctrl) {
 }
 
 Controller::Controller(const string& window_name, int width, int height)
-    : bg{0, 0, 0, 0xff}, quit{false} {
+    : bg{0, 0, 0, 0xff},
+      quit{false},
+      mouseButton{false, false, false},
+      isMouseUp(false),
+      isMouseDown{false} {
   key_pressed.resize(listened_keys.size(), false);
   key_pressed_old.resize(listened_keys.size(), false);
   assert(SDL_Init(SDL_INIT_VIDEO) >= 0);
@@ -122,27 +127,69 @@ int Controller::textHeight(std::string font) {
 }
 
 SDL_Texture* Controller::loadImage(const std::string& data) {
+  SDL_Surface* srf = loadImageSurface(data);
+  SDL_Texture* img = SDL_CreateTextureFromSurface(renderer, srf);
+  SDL_FreeSurface(srf);
+  return img;
+}
+
+SDL_Surface* Controller::loadImageSurface(const std::string& data) {
   SDL_RWops* rw;
   SDL_Surface* srf;
   assert(rw = SDL_RWFromConstMem((const void*)data.data(), data.size()));
   assert(srf = IMG_Load_RW(rw, 1));
-  SDL_Texture* img = SDL_CreateTextureFromSurface(renderer, srf);
-  SDL_FreeSurface(srf);
-  return img;
+  return srf;
 }
 
 uint32_t Controller::iteration() {
   SDL_Event e;
   uint32_t start = SDL_GetTicks();
   key_pressed_old = key_pressed;
+  isMouseDown = isMouseUp = false;
   while (SDL_PollEvent(&e) != 0) {
-    if (e.type == SDL_KEYDOWN) {
-      for (int i = 0; i < listened_keys.size(); i++)
-        if (e.key.keysym.sym == listened_keys[i]) key_pressed[i] = true;
-    } else if (e.type == SDL_KEYUP) {
-      for (int i = 0; i < listened_keys.size(); i++)
-        if (e.key.keysym.sym == listened_keys[i]) key_pressed[i] = false;
+    switch (e.type) {
+      case SDL_KEYDOWN:
+        for (int i = 0; i < listened_keys.size(); i++)
+          if (e.key.keysym.sym == listened_keys[i]) key_pressed[i] = true;
+        break;
+      case SDL_KEYUP:
+        for (int i = 0; i < listened_keys.size(); i++)
+          if (e.key.keysym.sym == listened_keys[i]) key_pressed[i] = false;
+        break;
+      case SDL_MOUSEMOTION:
+        mouseX = e.motion.x;
+        mouseY = e.motion.y;
+        break;
+      case SDL_MOUSEBUTTONDOWN:
+        isMouseDown = true;
+        switch (e.button.button) {
+          case SDL_BUTTON_LEFT:
+            mouseButton[0] = true;
+            break;
+          case SDL_BUTTON_MIDDLE:
+            mouseButton[1] = true;
+            break;
+          case SDL_BUTTON_RIGHT:
+            mouseButton[2] = true;
+            break;
+        }
+        break;
+      case SDL_MOUSEBUTTONUP:
+        isMouseUp = true;
+        switch (e.button.button) {
+          case SDL_BUTTON_LEFT:
+            mouseButton[0] = false;
+            break;
+          case SDL_BUTTON_MIDDLE:
+            mouseButton[1] = false;
+            break;
+          case SDL_BUTTON_RIGHT:
+            mouseButton[2] = false;
+            break;
+        }
+        break;
     }
+
     if (microUi.on) {
       switch (e.type) {
         case SDL_MOUSEMOTION:
@@ -204,7 +251,7 @@ void Controller::run() {
   }
 }
 
-SDL_Rect *Controller::screen() {
+SDL_Rect* Controller::screen() {
   int w, h;
   SDL_GetWindowSize(sdl_window, &w, &h);
   _screen = SDL_Rect{.x = 0, .y = 0, .w = w, .h = h};

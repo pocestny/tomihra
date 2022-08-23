@@ -18,15 +18,18 @@
 
 struct ULPCcharacter : public Sprite {
   std::string facing, cycle;
-  SDL_Rect old_rect, old_collision_rect;  // used with tryMove
+   SDL_Rect old_rect, old_collision_rect;  // used with tryMove
+
   std::function<void(std::string)> start_new;
   std::string skin;
   ULPCcharacter(
       uint32_t _id, SDL_Renderer* _renderer,
       const std::vector<std::pair<std::string, std::string>> &charsheets);
 
-  void tryMove(const std::array<bool, 4>& arrowsPressed, float speed);
+ void tryMove(const std::array<bool, 4>& arrowsPressed, float speed);
   void revertMove();
+
+
 };
 
 #endif

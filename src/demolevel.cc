@@ -2,18 +2,19 @@
 
 using namespace std;
 
-DemoLevel::DemoLevel (SDL_Renderer *_renderer) : TerrainMap (_renderer, 24, 150, 150, 3000){
-  #include "demolevel.inc"
+DemoLevel::DemoLevel(SDL_Renderer* _renderer)
+    : TerrainMap(_renderer, 24, 150, 150, 3000) {
+#include "demolevel.inc"
 
- for (int i:{0,1,5,6,7,8,9})
-  collision_active_layers.erase(i);
- 
-   for (int i:{5,7,9})
-  visible_layers.erase(i);
-}
+  for (const string& s :
+       {"door open",  "chest_open", "proximity", "shine", "keyshine"})
+    layers[layerIDs[s]].visible = false;
 
-void DemoLevel::render_stage(int stage, const SDL_Rect *camera){
-  static const vector<vector<int>> stage_layers{{0,1,2,3,4,5,9},{6,8}};
-  for (auto &l:stage_layers[stage])if (visible_layers.count(l))
-    render(l,camera);
+  for (const string& s : {"background", "shadow", "door open",
+                    "chest_open", "proximity", "shine","keyshine"})
+    layers[layerIDs[s]].collision_active = false;
+
+  addStage({"background", "door closed", "shadow", "base",
+             "grass", "chest_open", "chest_closed","shine","keyshine"});
+  addStage({"base_top","very-top","door open"});
 }

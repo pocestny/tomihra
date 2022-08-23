@@ -6,7 +6,7 @@
 
 struct CollisionLayer {
   uint32_t tilesize,w,h;
-  std::vector<uint32_t> data;
+  std::vector<std::vector<uint32_t>> data;
 
   CollisionLayer(uint32_t _tilesize, uint32_t _w, uint32_t _h);
   void clear();

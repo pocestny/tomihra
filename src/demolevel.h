@@ -5,7 +5,6 @@
 
 struct DemoLevel : public TerrainMap {
   DemoLevel (SDL_Renderer *_renderer);
-  void render_stage(int stage, const SDL_Rect *camera);
 };
 
 #endif

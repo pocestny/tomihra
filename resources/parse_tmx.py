@@ -64,11 +64,12 @@ for t in filter(lambda x:len(x.tiles)>0,tilesets):
         t.source,str(t.tiles)[1:-1],str(ids)[1:-1],str(t.solid)[1:-1]))
 
 print()
-lcnt=0
 for layer in doc.findall('.//layer'):
     w=int(layer.get('width'))
     h=int(layer.get('height'))
+    name=layer.get('name')
     op=layer.get('opacity')
+    lid=layer.get('id')
     if op!=None:
         opacity=float(op)
     else:
@@ -76,8 +77,8 @@ for layer in doc.findall('.//layer'):
     data = list(map(lambda x:int(x), layer[0].text.split(",")))
     im=Image.new("RGBA",(w,h))
     im.putdata(list(map(lambda x: ((x>>24)&0xff,(x>>16)&0xff,(x>>8)&0xff,x&0xff),data)))
-    im.save('layer{}.png'.format(layer.get('id')),"PNG")
-    print("%T%addTileMap({},%R%::layer{}(),{});".format(lcnt,layer.get('id'),opacity))
-    lcnt=lcnt+1
+    im.save('layer{}.png'.format(lid),"PNG")
+    print('%T%addRenderLayer("{}",{});'.format(name,opacity))
+    print('%T%addSurfaceToLayer("{}", %R%::layer{}());'.format(name,lid))
 
 
